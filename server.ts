@@ -132,35 +132,24 @@ async function startServer() {
   // --- STEADFAST COURIER (SFC) INTEGRATION ---
   const STEADFAST_API_KEY = process.env.STEADFAST_API_KEY || 'lhigcp1yxdqrcdtmhth0cvdekae3c8u2';
   const STEADFAST_SECRET_KEY = process.env.STEADFAST_SECRET_KEY || '7ksaufrn6qqjhxpk0prsugls';
-  const STEADFAST_BASE_URLS = [
-    'https://portal.packzy.com/api/v1',
-    'https://portal.steadfast.com.bd/api/v1'
-  ];
+  const STEADFAST_BASE_URL = 'https://portal.packzy.com/api/v1';
 
-  // In-memory cache for Steadfast status queries (5 mins for found, 2 mins for not-found)
+  // In-memory cache for Steadfast status queries (30 seconds TTL)
   const sfcCache = new Map<string, { data: any; expiresAt: number }>();
 
-  async function querySteadfastStatus(cnNumber?: any, trackingCode?: any, invoiceId?: any, customApiKey?: string, customSecretKey?: string) {
+  async function querySteadfastStatus(cnNumber?: any, trackingCode?: any) {
     const rawCn = (cnNumber !== undefined && cnNumber !== null ? String(cnNumber) : '').trim();
     const rawTrack = (trackingCode !== undefined && trackingCode !== null ? String(trackingCode) : '').trim();
-    const rawInv = (invoiceId !== undefined && invoiceId !== null ? String(invoiceId) : '').trim();
     
-    if (!rawCn && !rawTrack && !rawInv) {
-      return { success: false, delivery_status: 'not_found', message: 'No consignment or tracking identifier provided' };
-    }
-
-    const apiKey = customApiKey || STEADFAST_API_KEY;
-    const secretKey = customSecretKey || STEADFAST_SECRET_KEY;
-
-    const cacheKey = `${apiKey.slice(0, 6)}||${rawCn}||${rawTrack}||${rawInv}`;
+    const cacheKey = `${rawCn}||${rawTrack}`;
     const cached = sfcCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data;
     }
 
     const headers = {
-      'Api-Key': apiKey,
-      'Secret-Key': secretKey,
+      'Api-Key': STEADFAST_API_KEY,
+      'Secret-Key': STEADFAST_SECRET_KEY,
       'Content-Type': 'application/json'
     };
 
@@ -174,106 +163,95 @@ async function startServer() {
       }
     }
 
-    // Candidates for Tracking lookup
-    const trackCandidates: string[] = [];
-    if (rawTrack) trackCandidates.push(rawTrack);
-    if (rawCn && rawCn.length >= 6) trackCandidates.push(rawCn);
-
-    // Candidates for Invoice lookup
-    const invCandidates: string[] = [];
-    if (rawInv) invCandidates.push(rawInv);
-    if (rawCn && !invCandidates.includes(rawCn)) invCandidates.push(rawCn);
-
-    for (const baseUrl of STEADFAST_BASE_URLS) {
-      // 1. Try status_by_cid
-      for (const cid of cidCandidates) {
-        try {
-          const res = await fetch(`${baseUrl}/status_by_cid/${encodeURIComponent(cid)}`, { headers });
-          if (res.ok) {
-            const json: any = await res.json();
-            if (json && (json.status === 200 || json.delivery_status)) {
-              const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
-              const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
-              const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
-              const result = { 
-                success: true, 
-                delivery_status: json.delivery_status || 'unknown', 
-                delivery_charge: deliveryCharge,
-                cod_fee: codFee,
-                details: json, 
-                matchedBy: 'cid', 
-                matchedId: cid,
-                updatedAt: new Date().toISOString()
-              };
-              sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + 5 * 60 * 1000 });
-              return result;
-            }
+    // 1. Try status_by_cid
+    for (const cid of cidCandidates) {
+      try {
+        const res = await fetch(`${STEADFAST_BASE_URL}/status_by_cid/${encodeURIComponent(cid)}`, { headers });
+        if (res.ok) {
+          const json: any = await res.json();
+          if (json && (json.status === 200 || json.delivery_status)) {
+            const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
+            const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
+            const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
+            const result = { 
+              success: true, 
+              delivery_status: json.delivery_status || 'unknown', 
+              delivery_charge: deliveryCharge,
+              cod_fee: codFee,
+              details: json, 
+              matchedBy: 'cid', 
+              matchedId: cid 
+            };
+            sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + 30000 });
+            return result;
           }
-        } catch (e) {}
-      }
-
-      // 2. Try status_by_trackingcode
-      for (const track of trackCandidates) {
-        try {
-          const res = await fetch(`${baseUrl}/status_by_trackingcode/${encodeURIComponent(track)}`, { headers });
-          if (res.ok) {
-            const json: any = await res.json();
-            if (json && (json.status === 200 || json.delivery_status)) {
-              const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
-              const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
-              const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
-              const result = { 
-                success: true, 
-                delivery_status: json.delivery_status || 'unknown', 
-                delivery_charge: deliveryCharge,
-                cod_fee: codFee,
-                details: json, 
-                matchedBy: 'tracking_code', 
-                matchedId: track,
-                updatedAt: new Date().toISOString()
-              };
-              sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + 5 * 60 * 1000 });
-              return result;
-            }
-          }
-        } catch (e) {}
-      }
-
-      // 3. Try status_by_invoice
-      for (const inv of invCandidates) {
-        try {
-          const res = await fetch(`${baseUrl}/status_by_invoice/${encodeURIComponent(inv)}`, { headers });
-          if (res.ok) {
-            const json: any = await res.json();
-            if (json && (json.status === 200 || json.delivery_status)) {
-              const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
-              const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
-              const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
-              const result = { 
-                success: true, 
-                delivery_status: json.delivery_status || 'unknown', 
-                delivery_charge: deliveryCharge,
-                cod_fee: codFee,
-                details: json, 
-                matchedBy: 'invoice', 
-                matchedId: inv,
-                updatedAt: new Date().toISOString()
-              };
-              sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + 5 * 60 * 1000 });
-              return result;
-            }
-          }
-        } catch (e) {}
+        }
+      } catch (e) {
+        console.warn(`[SFC] CID lookup failed for ${cid}:`, e);
       }
     }
 
-    const notFoundResult = { 
-      success: false, 
-      delivery_status: 'not_found', 
-      message: 'No active Steadfast record found',
-      checkedAt: new Date().toISOString()
-    };
-    sfcCache.set(cacheKey, { data: notFoundResult, expiresAt: Date.now() + 2 * 60 * 1000 });
+    // 2. Try status_by_trackingcode
+    const trackCandidate = rawTrack || (rawCn.length > 5 ? rawCn : '');
+    if (trackCandidate) {
+      try {
+        const res = await fetch(`${STEADFAST_BASE_URL}/status_by_trackingcode/${encodeURIComponent(trackCandidate)}`, { headers });
+        if (res.ok) {
+          const json: any = await res.json();
+          if (json && (json.status === 200 || json.delivery_status)) {
+            const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
+            const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
+            const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
+            const result = { 
+              success: true, 
+              delivery_status: json.delivery_status || 'unknown', 
+              delivery_charge: deliveryCharge,
+              cod_fee: codFee,
+              details: json, 
+              matchedBy: 'tracking_code', 
+              matchedId: trackCandidate 
+            };
+            sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + 30000 });
+            return result;
+          }
+        }
+      } catch (e) {
+        console.warn(`[SFC] Tracking lookup failed for ${trackCandidate}:`, e);
+      }
+    }
+
+    // 3. Try status_by_invoice
+    const invCandidates: string[] = [];
+    if (rawCn) invCandidates.push(rawCn);
+    for (const inv of invCandidates) {
+      try {
+        const res = await fetch(`${STEADFAST_BASE_URL}/status_by_invoice/${encodeURIComponent(inv)}`, { headers });
+        if (res.ok) {
+          const json: any = await res.json();
+          if (json && (json.status === 200 || json.delivery_status)) {
+            const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
+            const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
+            const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
+            const result = { 
+              success: true, 
+              delivery_status: json.delivery_status || 'unknown', 
+              delivery_charge: deliveryCharge,
+              cod_fee: codFee,
+              details: json, 
+              matchedBy: 'invoice', 
+              matchedId: inv 
+            };
+            sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + 30000 });
+            return result;
+          }
+        }
+      } catch (e) {
+        console.warn(`[SFC] Invoice lookup failed for ${inv}:`, e);
+      }
+    }
+
+    const notFoundResult = { success: false, delivery_status: 'not_found', message: 'No active Steadfast record found' };
+    sfcCache.set(cacheKey, { data: notFoundResult, expiresAt: Date.now() + 20000 });
     return notFoundResult;
   }
 
@@ -281,11 +259,7 @@ async function startServer() {
     try {
       const cnNumber = req.params.cnNumber;
       const trackingCode = req.query.tracking as string;
-      const invoiceId = req.query.invoice as string;
-      const customApiKey = req.headers['x-steadfast-api-key'] as string | undefined;
-      const customSecretKey = req.headers['x-steadfast-secret-key'] as string | undefined;
-      
-      const result = await querySteadfastStatus(cnNumber, trackingCode, invoiceId, customApiKey, customSecretKey);
+      const result = await querySteadfastStatus(cnNumber, trackingCode);
       res.json(result);
     } catch (err: any) {
       console.error('[SFC API Error]', err);
@@ -295,10 +269,8 @@ async function startServer() {
 
   app.post('/api/steadfast/status', async (req, res) => {
     try {
-      const { cnNumber, trackingCode, invoiceId } = req.body;
-      const customApiKey = req.headers['x-steadfast-api-key'] as string | undefined;
-      const customSecretKey = req.headers['x-steadfast-secret-key'] as string | undefined;
-      const result = await querySteadfastStatus(cnNumber, trackingCode, invoiceId, customApiKey, customSecretKey);
+      const { cnNumber, trackingCode } = req.body;
+      const result = await querySteadfastStatus(cnNumber, trackingCode);
       res.json(result);
     } catch (err: any) {
       console.error('[SFC API Error]', err);
@@ -312,28 +284,15 @@ async function startServer() {
       if (!Array.isArray(items)) {
         return res.status(400).json({ error: 'items must be an array' });
       }
-      const customApiKey = req.headers['x-steadfast-api-key'] as string | undefined;
-      const customSecretKey = req.headers['x-steadfast-secret-key'] as string | undefined;
-
       const results: Record<string, any> = {};
-      const validItems = items.slice(0, 150).filter((item: any) => item && (item.id || item.cnNumber));
-      
-      // Batch in controlled concurrency to prevent 429 rate limits
-      const BATCH_SIZE = 6;
-      for (let i = 0; i < validItems.length; i += BATCH_SIZE) {
-        const batch = validItems.slice(i, i + BATCH_SIZE);
-        await Promise.all(
-          batch.map(async (item: any) => {
-            const orderId = item.id || item.cnNumber;
-            const status = await querySteadfastStatus(item.cnNumber, item.trackingCode, item.id || item.invoiceId, customApiKey, customSecretKey);
-            results[orderId] = status;
-          })
-        );
-        if (i + BATCH_SIZE < validItems.length) {
-          await new Promise(r => setTimeout(r, 25));
-        }
-      }
-      res.json({ results, count: Object.keys(results).length, timestamp: new Date().toISOString() });
+      await Promise.all(
+        items.slice(0, 100).map(async (item: any) => {
+          if (!item || !item.id) return;
+          const status = await querySteadfastStatus(item.cnNumber, item.trackingCode);
+          results[item.id] = status;
+        })
+      );
+      res.json({ results });
     } catch (err: any) {
       console.error('[SFC Bulk API Error]', err);
       res.status(500).json({ success: false, error: err.message });
@@ -342,42 +301,18 @@ async function startServer() {
 
   app.get('/api/steadfast/balance', async (req, res) => {
     try {
-      const customApiKey = req.headers['x-steadfast-api-key'] as string | undefined;
-      const customSecretKey = req.headers['x-steadfast-secret-key'] as string | undefined;
-      const apiKey = customApiKey || STEADFAST_API_KEY;
-      const secretKey = customSecretKey || STEADFAST_SECRET_KEY;
-
-      const headers = {
-        'Api-Key': apiKey,
-        'Secret-Key': secretKey,
-        'Content-Type': 'application/json'
-      };
-
-      let lastError: string = '';
-      for (const baseUrl of STEADFAST_BASE_URLS) {
-        try {
-          const resp = await fetch(`${baseUrl}/get_balance`, { headers });
-          if (resp.ok) {
-            const data: any = await resp.json();
-            return res.json({
-              success: true,
-              connected: true,
-              balance: data.current_balance !== undefined ? Number(data.current_balance) : 0,
-              data,
-              baseUrl,
-              checkedAt: new Date().toISOString()
-            });
-          } else {
-            lastError = `HTTP ${resp.status} ${resp.statusText}`;
-          }
-        } catch (e: any) {
-          lastError = e.message;
+      const resp = await fetch(`${STEADFAST_BASE_URL}/get_balance`, {
+        headers: {
+          'Api-Key': STEADFAST_API_KEY,
+          'Secret-Key': STEADFAST_SECRET_KEY,
+          'Content-Type': 'application/json'
         }
-      }
-      res.json({ success: false, connected: false, error: lastError || 'Connection failed', checkedAt: new Date().toISOString() });
+      });
+      const data = await resp.json();
+      res.json(data);
     } catch (err: any) {
       console.error('[SFC Balance Error]', err);
-      res.status(500).json({ success: false, error: err.message });
+      res.status(500).json({ error: err.message });
     }
   });
 

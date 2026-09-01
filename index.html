@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -3478,98 +3478,6 @@
                   </div>
                 </div>
 
-                <!-- STEADFAST COURIER INTEGRATION & DIAGNOSTICS -->
-                <div
-                  class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs space-y-4"
-                >
-                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <h3
-                        class="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"
-                      >
-                        🚚 Steadfast Courier API Integration Status
-                      </h3>
-                      <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Test connection, check account balance, and verify real-time status syncing across all workstations.
-                      </p>
-                    </div>
-                    <button
-                      @click="testSteadfastConnection"
-                      :disabled="sfcConnectionStatus.loading"
-                      class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 self-start sm:self-auto"
-                    >
-                      <svg
-                        v-if="sfcConnectionStatus.loading"
-                        class="w-4 h-4 animate-spin text-white"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          class="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          stroke-width="4"
-                        ></circle>
-                        <path
-                          class="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      <svg
-                        v-else
-                        class="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                        />
-                      </svg>
-                      <span>{{ sfcConnectionStatus.loading ? 'Testing Connection...' : 'Test Steadfast Connection' }}</span>
-                    </button>
-                  </div>
-
-                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                    <div class="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-                      <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Connection Health</div>
-                      <div class="mt-1 flex items-center gap-2">
-                        <span
-                          class="w-2.5 h-2.5 rounded-full"
-                          :class="sfcConnectionStatus.tested ? (sfcConnectionStatus.connected ? 'bg-emerald-500' : 'bg-rose-500') : 'bg-emerald-500'"
-                        ></span>
-                        <span class="text-sm font-bold text-slate-800 dark:text-slate-200">
-                          {{ sfcConnectionStatus.tested ? (sfcConnectionStatus.connected ? '🟢 Active & Connected' : '🔴 Connection Failed') : '🟢 API Ready & Active' }}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div class="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-                      <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Merchant Account Balance</div>
-                      <div class="mt-1 text-sm font-extrabold text-indigo-600 dark:text-indigo-400 font-mono">
-                        {{ sfcConnectionStatus.tested && sfcConnectionStatus.connected ? '৳' + Number(sfcConnectionStatus.balance).toLocaleString() : 'Click Test to View' }}
-                      </div>
-                    </div>
-
-                    <div class="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-                      <div class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Synced Workstations</div>
-                      <div class="mt-1 text-sm font-bold text-slate-700 dark:text-slate-300">
-                        All Devices (Synced via Cloud & Cache)
-                      </div>
-                    </div>
-                  </div>
-
-                  <div v-if="sfcConnectionStatus.error" class="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-xl text-xs text-rose-700 dark:text-rose-300 font-medium">
-                    ⚠️ Diagnostic: {{ sfcConnectionStatus.error }}
-                  </div>
-                </div>
-
                 <!-- SNAPSHOT BACKUP SYSTEM -->
                 <div
                   class="bg-indigo-50 dark:bg-indigo-950/20 p-6 rounded-2xl border border-indigo-200 dark:border-indigo-800 shadow-xs"
@@ -4786,27 +4694,25 @@
                       >
                         <div>
                           <label
-                            class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between"
+                            class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1"
                           >
-                            <span>COD Amount (BDT) *</span>
-                            <span class="text-[10px] text-slate-400 font-normal">Cash on Delivery</span>
+                            Sale Amount (Items) (BDT) *
                           </label>
                           <input
-                            v-model.number="intakeForm.codAmount"
+                            v-model.number="intakeForm.saleAmount"
                             type="number"
                             min="0"
                             placeholder="e.g. 12500"
-                            :class="{'ring-2 ring-amber-400 bg-amber-50/50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-600': missingFieldsHighlight && (!intakeForm.codAmount || intakeForm.codAmount === 0)}"
+                            :class="{'ring-2 ring-amber-400 bg-amber-50/50 dark:bg-amber-900/20 border-amber-300 dark:border-amber-600': missingFieldsHighlight && (!intakeForm.saleAmount || intakeForm.saleAmount === 0)}"
                             class="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none"
                           />
                         </div>
                         
                         <div>
                           <label
-                            class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between"
+                            class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1"
                           >
-                            <span>Delivery Amount (BDT) *</span>
-                            <span class="text-[10px] text-indigo-600 dark:text-indigo-400 font-normal">Courier Fee</span>
+                            Delivery Charge (BDT) *
                           </label>
                           <input
                             v-model.number="intakeForm.deliveryCharge"
@@ -4818,31 +4724,17 @@
                         </div>
 
                         <div
-                          class="col-span-1 md:col-span-2 bg-white/70 dark:bg-slate-800/80 p-3 rounded-xl border border-indigo-100 dark:border-indigo-900/50 flex items-center justify-between shadow-xs"
+                          class="col-span-1 md:col-span-2 bg-white/70 dark:bg-slate-800/80 p-3 rounded-xl border border-indigo-100 dark:border-indigo-900/50 flex flex-col justify-center"
                         >
-                          <div>
-                            <div
-                              class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider"
-                            >
-                              Net Item Sale (COD − Delivery)
-                            </div>
-                            <div
-                              class="text-xl font-black text-emerald-700 dark:text-emerald-300 mt-0.5"
-                            >
-                              {{ formatBDT(Math.max(0, (intakeForm.codAmount || 0) - (intakeForm.deliveryCharge || 0))) }}
-                            </div>
+                          <div
+                            class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider"
+                          >
+                            Total Customer Payable
                           </div>
-                          <div class="text-right">
-                            <div
-                              class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider"
-                            >
-                              Total COD Customer Payable
-                            </div>
-                            <div
-                              class="text-lg font-black text-indigo-700 dark:text-indigo-300 mt-0.5"
-                            >
-                              {{ formatBDT(intakeForm.codAmount || 0) }}
-                            </div>
+                          <div
+                            class="text-xl font-black text-indigo-700 dark:text-indigo-300 mt-0.5"
+                          >
+                            {{ formatBDT((intakeForm.saleAmount || 0) + (intakeForm.deliveryCharge || 0)) }}
                           </div>
                         </div>
                       </div>
@@ -7384,13 +7276,13 @@
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <!-- Base Item Sale Price / COD Amount -->
+                      <!-- Base Item Sale Price -->
                       <div>
                         <label
                           class="block font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between"
                         >
-                          <span>COD Amount (BDT)</span>
-                          <span class="text-[10px] text-slate-400 font-normal">Cash on Delivery</span>
+                          <span>Item Sale Price (BDT)</span>
+                          <span class="text-[10px] text-slate-400 font-normal">Base Product</span>
                         </label>
                         <div class="relative">
                           <span
@@ -7398,7 +7290,7 @@
                             >৳</span
                           >
                           <input
-                            v-model.number="modalData.order.codAmount"
+                            v-model.number="modalData.order.saleAmount"
                             @input="onEditOrderSaleOrDeliveryChange"
                             type="number"
                             min="0"
@@ -7413,7 +7305,7 @@
                         <label
                           class="block font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between"
                         >
-                          <span class="text-indigo-900 dark:text-indigo-200 font-bold">Delivery Amount (BDT)</span>
+                          <span class="text-indigo-900 dark:text-indigo-200 font-bold">Delivery Charge (BDT)</span>
                           <span class="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">Courier Fee</span>
                         </label>
                         <div class="relative">
@@ -7484,20 +7376,20 @@
                       </div>
                     </div>
 
-                    <!-- Net Item Sale & COD Payable Banner -->
+                    <!-- Total Customer Payable Banner -->
                     <div
                       class="p-3 bg-white dark:bg-slate-800/90 rounded-xl border border-indigo-100 dark:border-indigo-900/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-xs"
                     >
                       <div>
                         <div
-                          class="text-[10px] font-extrabold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider"
+                          class="text-[10px] font-extrabold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider"
                         >
-                          Net Item Sale (COD − Delivery)
+                          Total Customer Payable
                         </div>
                         <div
                           class="text-xs text-slate-500 dark:text-slate-400 font-medium"
                         >
-                          COD ({{ formatBDT(modalData.order.codAmount || modalData.order.totalAmount || 0) }}) − Delivery ({{ formatBDT(modalData.order.deliveryCharge || 0) }})
+                          Item ({{ formatBDT(modalData.order.saleAmount || 0) }}) + Delivery ({{ formatBDT(modalData.order.deliveryCharge || 0) }})
                         </div>
                       </div>
                       <div
@@ -7505,14 +7397,15 @@
                       >
                         <div class="relative w-36">
                           <span
-                            class="absolute left-2.5 top-2 text-emerald-600 dark:text-emerald-400 font-black text-sm pointer-events-none"
+                            class="absolute left-2.5 top-2 text-indigo-600 dark:text-indigo-400 font-black text-sm pointer-events-none"
                             >৳</span
                           >
                           <input
-                            :value="Math.max(0, (modalData.order.codAmount || modalData.order.totalAmount || 0) - (modalData.order.deliveryCharge || 0))"
-                            readonly
+                            v-model.number="modalData.order.totalAmount"
+                            @input="onEditOrderTotalChange"
                             type="number"
-                            class="w-full pl-6 pr-2.5 py-1.5 bg-emerald-50/60 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 rounded-lg text-base font-black text-emerald-700 dark:text-emerald-300 focus:outline-none text-right cursor-default"
+                            min="0"
+                            class="w-full pl-6 pr-2.5 py-1.5 bg-indigo-50/60 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 rounded-lg text-base font-black text-indigo-700 dark:text-indigo-300 focus:outline-none text-right"
                           />
                         </div>
                       </div>
@@ -7971,39 +7864,19 @@
                       >
                         Consignment No (CN): {{ modalData.order.cnNumber }}
                       </div>
-                      <div class="flex items-center gap-2">
+                      <span
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-extrabold border shadow-2xs"
+                        :class="getSfcTagClass(modalData.order)"
+                      >
                         <span
-                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-extrabold border shadow-2xs cursor-pointer select-none"
-                          :class="getSfcTagClass(modalData.order)"
-                          @click="refreshSingleSfcStatus(modalData.order)"
-                          :title="'Click to refresh Steadfast status'"
+                          class="w-2 h-2 rounded-full shrink-0"
+                          :class="getSfcDotClass(modalData.order)"
+                        ></span>
+                        <span
+                          >SFC Status: {{ getSfcStatusLabel(modalData.order)
+                          }}</span
                         >
-                          <span
-                            class="w-2 h-2 rounded-full shrink-0"
-                            :class="getSfcDotClass(modalData.order)"
-                          ></span>
-                          <span
-                            >SFC: {{ getSfcStatusLabel(modalData.order) }}</span
-                          >
-                          <svg
-                            v-if="isSfcLoading(modalData.order)"
-                            class="w-3 h-3 animate-spin text-current"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        </span>
-                        <button
-                          type="button"
-                          @click="refreshSingleSfcStatus(modalData.order)"
-                          :disabled="isSfcLoading(modalData.order)"
-                          class="px-2 py-1 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-bold rounded-lg border border-slate-200 dark:border-slate-700 transition-all flex items-center gap-1 shadow-2xs"
-                        >
-                          <span>🔄 Refresh</span>
-                        </button>
-                      </div>
+                      </span>
                     </div>
                   </div>
 
@@ -9634,82 +9507,95 @@
 
                 <!-- TASK REMINDER MODAL -->
                 <div
-                  v-if="activeModal === 'taskReminderModal' && taskReminderModal.task"
+                  v-if="activeModal === 'taskReminderModal' && modalData.task"
                   class="space-y-4 text-xs"
                 >
-                  <div class="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl">
-                    <div class="font-bold text-amber-900 dark:text-amber-200 text-sm mb-1">
-                      ⏰ Set Task Reminder
+                  <div class="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center text-xl font-bold shrink-0">
+                      ⏰
                     </div>
-                    <div class="text-slate-600 dark:text-slate-300 font-medium">
-                      {{ taskReminderModal.task.title }}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label class="block font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                      Reminder Date & Time (BST)
-                    </label>
-                    <input
-                      v-model="taskReminderModal.reminderAt"
-                      type="datetime-local"
-                      class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                    />
-                  </div>
-
-                  <!-- Quick Presets -->
-                  <div>
-                    <div class="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1.5">
-                      ⚡ Quick Presets:
-                    </div>
-                    <div class="flex flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        @click="snoozeTaskReminder(taskReminderModal.task, 1); closeModal()"
-                        class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-all"
-                      >
-                        +1 Hour
-                      </button>
-                      <button
-                        type="button"
-                        @click="snoozeTaskReminder(taskReminderModal.task, 3); closeModal()"
-                        class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-all"
-                      >
-                        +3 Hours
-                      </button>
-                      <button
-                        type="button"
-                        @click="snoozeTaskReminder(taskReminderModal.task, 24); closeModal()"
-                        class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-all"
-                      >
-                        Tomorrow (+24h)
-                      </button>
+                    <div>
+                      <h4 class="text-xs font-black text-amber-950 dark:text-amber-100 uppercase tracking-wider">
+                        Task Reminder Setup
+                      </h4>
+                      <p class="text-[11px] text-amber-800/80 dark:text-amber-300/80 font-medium">
+                        {{ modalData.task.title }}
+                      </p>
                     </div>
                   </div>
 
-                  <div class="flex items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <div class="space-y-3">
+                    <!-- Quick Presets -->
+                    <div>
+                      <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                        Quick Snooze / Schedule Presets:
+                      </label>
+                      <div class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                        <button
+                          type="button"
+                          @click="snoozeTaskReminder(modalData.task, 1); closeModal();"
+                          class="p-2 text-center bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                        >
+                          +1 Hour
+                        </button>
+                        <button
+                          type="button"
+                          @click="snoozeTaskReminder(modalData.task, 3); closeModal();"
+                          class="p-2 text-center bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                        >
+                          +3 Hours
+                        </button>
+                        <button
+                          type="button"
+                          @click="snoozeTaskReminder(modalData.task, 24); closeModal();"
+                          class="p-2 text-center bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                        >
+                          +24 Hours
+                        </button>
+                        <button
+                          type="button"
+                          @click="snoozeTaskReminder(modalData.task, 48); closeModal();"
+                          class="p-2 text-center bg-slate-100 dark:bg-slate-800 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                        >
+                          +48 Hours
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Custom Date/Time -->
+                    <div>
+                      <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Or Pick Specific Date & Time:
+                      </label>
+                      <input
+                        v-model="taskReminderModal.reminderAt"
+                        type="datetime-local"
+                        class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white font-mono text-xs focus:border-amber-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-between gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
                     <button
-                      v-if="taskReminderModal.task.hasReminder"
-                      @click="clearTaskReminder(taskReminderModal.task); closeModal()"
+                      v-if="modalData.task.hasReminder"
+                      @click="clearTaskReminder(modalData.task); closeModal();"
                       type="button"
-                      class="px-3 py-2 bg-rose-50 dark:bg-rose-950/40 text-rose-600 hover:bg-rose-100 rounded-xl font-bold transition-all text-xs"
+                      class="px-3 py-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl font-bold transition-all text-xs cursor-pointer"
                     >
                       Clear Reminder
                     </button>
-                    <div v-else></div>
-
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-2 ml-auto">
                       <button
                         @click="closeModal"
                         type="button"
-                        class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-all text-xs"
+                        class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-all text-xs cursor-pointer"
                       >
                         Cancel
                       </button>
                       <button
-                        @click="saveTaskReminderModal"
+                        @click="saveTaskReminderModal()"
                         type="button"
-                        class="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold transition-all text-xs shadow-xs"
+                        class="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs transition-all shadow-sm cursor-pointer"
                       >
                         Save Reminder
                       </button>
@@ -9721,8 +9607,9 @@
           </div>
         </transition>
       </div>
+    </div>
 
-    <!-- Scripts -->
-    <script type="module" src="/app.js"></script>
+    <!-- VUE 3 COMPOSITION / OPTIONS SCRIPT -->
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

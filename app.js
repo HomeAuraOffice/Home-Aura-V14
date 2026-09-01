@@ -577,232 +577,6 @@
           }
         };
         
-        // --- STEADFAST COURIER (SFC) TOP-LEVEL STATE & REAL-TIME INTEGRATION ---
-        const storedSfc = localStorage.getItem('homeaura_sfc_cache');
-        let parsedSfc = {};
-        try {
-          if (storedSfc) parsedSfc = JSON.parse(storedSfc);
-        } catch (e) {
-          parsedSfc = {};
-        }
-        const sfcDeliveryStatuses = ref(parsedSfc || {});
-        watch(sfcDeliveryStatuses, (newVal) => {
-          try {
-            localStorage.setItem('homeaura_sfc_cache', JSON.stringify(newVal));
-          } catch (e) {}
-        }, { deep: true });
-        const sfcLoadingMap = ref({});
-
-        const isSfcLoading = (order) => {
-          if (!order || !order.id) return false;
-          return !!sfcLoadingMap.value[order.id];
-        };
-
-        const getSfcStatus = (order) => {
-          if (!order || !order.id) return null;
-          return sfcDeliveryStatuses.value[order.id] || (order.sfcDeliveryStatus ? { delivery_status: order.sfcDeliveryStatus, success: true } : null);
-        };
-
-        const getSfcStatusLabel = (order) => {
-          if (!order || !order.cnNumber) return '';
-          if (isSfcLoading(order)) return 'Checking...';
-          const sfc = getSfcStatus(order);
-          if (!sfc || !sfc.delivery_status) return 'SFC Assigned';
-          
-          const rawStatus = (sfc.delivery_status || '').toLowerCase().trim();
-          switch (rawStatus) {
-            case 'delivered': return 'Delivered';
-            case 'partial_delivered': return 'Partial Delivered';
-            case 'in_transit': return 'In Transit';
-            case 'pending': return 'Pending';
-            case 'in_review': return 'In Review';
-            case 'delivered_approval_pending': return 'Delivered (Pending)';
-            case 'partial_delivered_approval_pending': return 'Partial (Pending)';
-            case 'cancelled_approval_pending': return 'Cancelled (Pending)';
-            case 'unknown_approval_pending': return 'Unknown (Pending)';
-            case 'cancelled': return 'Cancelled';
-            case 'hold': return 'On Hold';
-            case 'not_found': return 'Active CN';
-            default:
-              return rawStatus.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          }
-        };
-
-        const getSfcTagClass = (order) => {
-          if (!order || !order.cnNumber) return '';
-          if (isSfcLoading(order)) {
-            return 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 animate-pulse';
-          }
-          const sfc = getSfcStatus(order);
-          const rawStatus = (sfc?.delivery_status || '').toLowerCase().trim();
-          switch (rawStatus) {
-            case 'delivered':
-              return 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60';
-            case 'partial_delivered':
-            case 'partial_delivered_approval_pending':
-              return 'bg-teal-50 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/60';
-            case 'in_transit':
-              return 'bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60';
-            case 'pending':
-            case 'in_review':
-              return 'bg-cyan-50 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60';
-            case 'hold':
-              return 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60';
-            case 'cancelled':
-            case 'cancelled_approval_pending':
-              return 'bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/60';
-            case 'delivered_approval_pending':
-              return 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60';
-            default:
-              return 'bg-indigo-50/80 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100';
-          }
-        };
-
-        const getSfcDotClass = (order) => {
-          if (!order || !order.cnNumber) return '';
-          if (isSfcLoading(order)) return 'bg-slate-400 animate-ping';
-          const sfc = getSfcStatus(order);
-          const rawStatus = (sfc?.delivery_status || '').toLowerCase().trim();
-          switch (rawStatus) {
-            case 'delivered': return 'bg-emerald-500';
-            case 'partial_delivered':
-            case 'partial_delivered_approval_pending': return 'bg-teal-500';
-            case 'in_transit': return 'bg-blue-500 animate-pulse';
-            case 'pending':
-            case 'in_review': return 'bg-cyan-500';
-            case 'hold': return 'bg-amber-500';
-            case 'cancelled':
-            case 'cancelled_approval_pending': return 'bg-rose-500';
-            case 'delivered_approval_pending': return 'bg-indigo-500';
-            default: return 'bg-indigo-500';
-          }
-        };
-
-        const fetchSfcStatus = async (order, force = false) => {
-          if (!order || !order.cnNumber) return null;
-          const cn = String(order.cnNumber).trim();
-          if (!cn) return null;
-
-          if (sfcLoadingMap.value[order.id]) return;
-          if (!force && sfcDeliveryStatuses.value[order.id] && sfcDeliveryStatuses.value[order.id].delivery_status && sfcDeliveryStatuses.value[order.id].delivery_status !== 'not_found') {
-            return sfcDeliveryStatuses.value[order.id];
-          }
-
-          sfcLoadingMap.value[order.id] = true;
-          try {
-            const track = order.trackingCode || order.tracking || '';
-            const inv = order.id || '';
-            const queryParams = new URLSearchParams();
-            if (track) queryParams.set('tracking', track);
-            if (inv) queryParams.set('invoice', inv);
-
-            const url = `/api/steadfast/status/${encodeURIComponent(cn)}${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
-            const res = await fetch(url);
-            if (res.ok) {
-              const data = await res.json();
-              sfcDeliveryStatuses.value[order.id] = data;
-              if (data && data.delivery_status && data.delivery_status !== 'not_found') {
-                order.sfcDeliveryStatus = data.delivery_status;
-              }
-              let chargeChanged = false;
-              if (data && data.cod_fee !== undefined && data.cod_fee !== null) {
-                const newCod = Number(data.cod_fee);
-                if (order.codCharge !== newCod) {
-                  order.codCharge = newCod;
-                  chargeChanged = true;
-                }
-              }
-              
-              if (chargeChanged) {
-                if (typeof getBstIsoString === 'function') order.updatedAt = getBstIsoString();
-                if (typeof saveOrdersLocally === 'function') saveOrdersLocally();
-              }
-              return data;
-            }
-          } catch (err) {
-            console.warn('[SFC Fetch Error]', err);
-          } finally {
-            sfcLoadingMap.value[order.id] = false;
-          }
-        };
-
-        const refreshSingleSfcStatus = async (order) => {
-          await fetchSfcStatus(order, true);
-        };
-
-        const fetchSfcStatusForOrders = async (ordersList) => {
-          const listWithCn = (ordersList || []).filter(o => o && o.cnNumber && String(o.cnNumber).trim());
-          if (listWithCn.length === 0) return;
-
-          const itemsToQuery = listWithCn.map(o => ({
-            id: o.id,
-            cnNumber: o.cnNumber,
-            trackingCode: o.trackingCode || o.tracking || '',
-            invoiceId: o.id
-          }));
-
-          try {
-            const res = await fetch('/api/steadfast/bulk-status', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ items: itemsToQuery })
-            });
-            if (res.ok) {
-              const data = await res.json();
-              if (data && data.results) {
-                let anyUpdated = false;
-                Object.keys(data.results).forEach(orderId => {
-                  const resObj = data.results[orderId];
-                  sfcDeliveryStatuses.value[orderId] = resObj;
-                  const ord = (orders.value || []).find(o => o.id === orderId);
-                  if (ord) {
-                    if (resObj && resObj.delivery_status && resObj.delivery_status !== 'not_found') {
-                      ord.sfcDeliveryStatus = resObj.delivery_status;
-                    }
-
-                    if (resObj && resObj.cod_fee !== undefined && resObj.cod_fee !== null) {
-                      const newCod = Number(resObj.cod_fee);
-                      if (ord.codCharge !== newCod) {
-                        ord.codCharge = newCod;
-                        anyUpdated = true;
-                      }
-                    }
-                  }
-                });
-                if (anyUpdated && typeof saveOrdersLocally === 'function') {
-                  saveOrdersLocally();
-                }
-              }
-            }
-          } catch (err) {
-            console.warn('[SFC Bulk Status Error]', err);
-          }
-        };
-
-        const sfcConnectionStatus = ref({ tested: false, loading: false, connected: false, balance: 0, error: null, checkedAt: null });
-        const testSteadfastConnection = async () => {
-          sfcConnectionStatus.value.loading = true;
-          sfcConnectionStatus.value.tested = true;
-          try {
-            const res = await fetch('/api/steadfast/balance');
-            const data = await res.json();
-            if (data && (data.success || data.connected || data.balance !== undefined)) {
-              sfcConnectionStatus.value.connected = true;
-              sfcConnectionStatus.value.balance = data.balance !== undefined ? data.balance : (data.current_balance !== undefined ? Number(data.current_balance) : 0);
-              sfcConnectionStatus.value.error = null;
-              sfcConnectionStatus.value.checkedAt = data.checkedAt || new Date().toISOString();
-            } else {
-              sfcConnectionStatus.value.connected = false;
-              sfcConnectionStatus.value.error = data.error || 'Unable to connect to Steadfast Courier API';
-            }
-          } catch (e) {
-            sfcConnectionStatus.value.connected = false;
-            sfcConnectionStatus.value.error = e.message;
-          } finally {
-            sfcConnectionStatus.value.loading = false;
-          }
-        };
-
         // --- ADVANCED TASK & REMINDERS STATE MANAGEMENT ---
         const newTask = reactive({
           title: '',
@@ -1806,10 +1580,7 @@
                     localOrd.socialProofFileName = remoteOrd.socialProofFileName;
                   }
 
-                  // Merge Fraud Assessment & SFC Status from remote orders into local state
-                  if (remoteOrd.sfcDeliveryStatus) {
-                    sfcDeliveryStatuses.value[remoteOrd.id] = { delivery_status: remoteOrd.sfcDeliveryStatus, success: true };
-                  }
+                  // Merge Fraud Assessment from remote orders into local state
                   if (remoteOrd.fraudData) {
                     let fData = remoteOrd.fraudData;
                     if (typeof fData === 'string') {
@@ -1827,9 +1598,6 @@
 
                   newOrdersList.push(localOrd);
                 } else {
-                  if (remoteOrd.sfcDeliveryStatus) {
-                    sfcDeliveryStatuses.value[remoteOrd.id] = { delivery_status: remoteOrd.sfcDeliveryStatus, success: true };
-                  }
                   if (remoteOrd.fraudData) {
                     let fData = remoteOrd.fraudData;
                     if (typeof fData === 'string') {
@@ -2176,13 +1944,8 @@
             }
           }
           orders.value = parsedOrders;
-          // Populate fraud & SFC cache from parsed orders
+          // Populate fraud cache from parsed orders
           orders.value.forEach(o => {
-            if (o && o.sfcDeliveryStatus && o.id) {
-              if (!sfcDeliveryStatuses.value[o.id]) {
-                sfcDeliveryStatuses.value[o.id] = { delivery_status: o.sfcDeliveryStatus, success: true };
-              }
-            }
             if (o && o.fraudData) {
               let f = o.fraudData;
               if (typeof f === 'string') {
@@ -2420,7 +2183,6 @@
           seatConfig: '3-Seater',
           fulfillmentMethod: 'Home Delivery',
           saleAmount: 0,
-          codAmount: 0,
           deliveryCharge: 0,
           urgent: false,
           notes: '',
@@ -3622,11 +3384,11 @@
             ctx.fillText('💵 FINANCIAL BREAKDOWN', padding + colWidth * 2 + 10, specY + 28);
             ctx.fillStyle = '#cbd5e1';
             ctx.font = '12px Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"';
-            ctx.fillText(`COD Amount: ৳${(ord.totalAmount || ord.codAmount || ((ord.saleAmount || 0) + (ord.deliveryCharge || 0))).toLocaleString()}`, padding + colWidth * 2 + 10, specY + 50);
-            ctx.fillText(`Delivery: -৳${(ord.deliveryCharge || 0).toLocaleString()}`, padding + colWidth * 2 + 10, specY + 70);
+            ctx.fillText(`Sale Price: ৳${(ord.saleAmount || 0).toLocaleString()}`, padding + colWidth * 2 + 10, specY + 50);
+            ctx.fillText(`Delivery: ৳${(ord.deliveryCharge || 0).toLocaleString()}`, padding + colWidth * 2 + 10, specY + 70);
             ctx.fillStyle = '#34d399';
             ctx.font = 'bold 16px Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"';
-            ctx.fillText(`Net Sale: ৳${(ord.saleAmount || Math.max(0, (ord.totalAmount || ord.codAmount || 0) - (ord.deliveryCharge || 0))).toLocaleString()}`, padding + colWidth * 2 + 10, specY + 98);
+            ctx.fillText(`TOTAL: ৳${(ord.totalAmount || 0).toLocaleString()}`, padding + colWidth * 2 + 10, specY + 98);
             ctx.fillStyle = '#64748b';
             ctx.font = '10px Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"';
             ctx.fillText(`Status: ${ord.status || 'Active'}`, padding + colWidth * 2 + 10, specY + 120);
@@ -4112,10 +3874,9 @@
           
           const normalizedPhone = normalizeCustomerPhone(intakeForm.customerPhone) || intakeForm.customerPhone;
           
-          const codAmountInput = Number(intakeForm.codAmount !== undefined && intakeForm.codAmount !== null && intakeForm.codAmount !== '' ? intakeForm.codAmount : intakeForm.saleAmount) || 0;
+          const saleAmountItems = Number(intakeForm.saleAmount) || 0;
           const initialDeliveryCharge = Number(intakeForm.deliveryCharge) || 0;
-          const netSaleAmount = Math.max(0, codAmountInput - initialDeliveryCharge);
-          const totalOrderPrice = codAmountInput;
+          const totalOrderPrice = saleAmountItems + initialDeliveryCharge;
 
           const newOrder = {
             id: newId,
@@ -4130,8 +3891,7 @@
             productCategory: intakeForm.productCategory,
             seatConfig: intakeForm.seatConfig,
             fulfillmentMethod: intakeForm.fulfillmentMethod,
-            codAmount: codAmountInput,
-            saleAmount: netSaleAmount,
+            saleAmount: saleAmountItems,
             deliveryCharge: initialDeliveryCharge,
             totalAmount: totalOrderPrice,
             status: 'Confirmation Call',
@@ -4178,7 +3938,6 @@
           intakeForm.customerPhone = '';
           intakeForm.customerAddress = '';
           intakeForm.fabric = '';
-          intakeForm.codAmount = 0;
           intakeForm.saleAmount = 0;
           intakeForm.deliveryCharge = 0;
           intakeForm.urgent = false;
@@ -4215,7 +3974,7 @@
 `;
           waText += `🚚 *Fulfillment:* ${newOrder.fulfillmentMethod}
 `;
-          waText += `💵 *COD Amount:* ৳${(newOrder.totalAmount || 0).toLocaleString()} (Delivery: ৳${(newOrder.deliveryCharge || 0).toLocaleString()} deducted, Net Sale: ৳${(newOrder.saleAmount || 0).toLocaleString()})
+          waText += `💵 *Total Payable:* ৳${(newOrder.totalAmount || 0).toLocaleString()} (Sale: ৳${(newOrder.saleAmount || 0).toLocaleString()} + Del: ৳${(newOrder.deliveryCharge || 0).toLocaleString()})
 `;
           waText += `📑 *CN:* ${newOrder.cnNumber || 'N/A'}
 `;
@@ -4928,6 +4687,185 @@ const executeBulkFactoryDispatch = async () => {
           }
         };
 
+        // --- STEADFAST COURIER (SFC) REAL-TIME DELIVERY STATUS INTEGRATION ---
+        const sfcDeliveryStatuses = ref({});
+        const sfcLoadingMap = ref({});
+
+        const isSfcLoading = (order) => {
+          if (!order || !order.id) return false;
+          return !!sfcLoadingMap.value[order.id];
+        };
+
+        const getSfcStatus = (order) => {
+          if (!order || !order.id) return null;
+          return sfcDeliveryStatuses.value[order.id] || (order.sfcDeliveryStatus ? { delivery_status: order.sfcDeliveryStatus, success: true } : null);
+        };
+
+        const getSfcStatusLabel = (order) => {
+          if (!order || !order.cnNumber) return '';
+          if (isSfcLoading(order)) return 'Checking...';
+          const sfc = getSfcStatus(order);
+          if (!sfc || !sfc.delivery_status) return 'SFC Assigned';
+          
+          const rawStatus = (sfc.delivery_status || '').toLowerCase().trim();
+          switch (rawStatus) {
+            case 'delivered': return 'Delivered';
+            case 'partial_delivered': return 'Partial Delivered';
+            case 'in_transit': return 'In Transit';
+            case 'pending': return 'Pending';
+            case 'in_review': return 'In Review';
+            case 'delivered_approval_pending': return 'Delivered (Pending)';
+            case 'partial_delivered_approval_pending': return 'Partial (Pending)';
+            case 'cancelled_approval_pending': return 'Cancelled (Pending)';
+            case 'unknown_approval_pending': return 'Unknown (Pending)';
+            case 'cancelled': return 'Cancelled';
+            case 'hold': return 'On Hold';
+            case 'not_found': return 'Active CN';
+            default:
+              return rawStatus.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          }
+        };
+
+        const getSfcTagClass = (order) => {
+          if (!order || !order.cnNumber) return '';
+          if (isSfcLoading(order)) {
+            return 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 animate-pulse';
+          }
+          const sfc = getSfcStatus(order);
+          const rawStatus = (sfc?.delivery_status || '').toLowerCase().trim();
+          switch (rawStatus) {
+            case 'delivered':
+              return 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/60';
+            case 'partial_delivered':
+            case 'partial_delivered_approval_pending':
+              return 'bg-teal-50 dark:bg-teal-950/80 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/60';
+            case 'in_transit':
+              return 'bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/60';
+            case 'pending':
+            case 'in_review':
+              return 'bg-cyan-50 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/60';
+            case 'hold':
+              return 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/60';
+            case 'cancelled':
+            case 'cancelled_approval_pending':
+              return 'bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/60';
+            case 'delivered_approval_pending':
+              return 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60';
+            default:
+              return 'bg-indigo-50/80 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100';
+          }
+        };
+
+        const getSfcDotClass = (order) => {
+          if (!order || !order.cnNumber) return '';
+          if (isSfcLoading(order)) return 'bg-slate-400 animate-ping';
+          const sfc = getSfcStatus(order);
+          const rawStatus = (sfc?.delivery_status || '').toLowerCase().trim();
+          switch (rawStatus) {
+            case 'delivered': return 'bg-emerald-500';
+            case 'partial_delivered':
+            case 'partial_delivered_approval_pending': return 'bg-teal-500';
+            case 'in_transit': return 'bg-blue-500 animate-pulse';
+            case 'pending':
+            case 'in_review': return 'bg-cyan-500';
+            case 'hold': return 'bg-amber-500';
+            case 'cancelled':
+            case 'cancelled_approval_pending': return 'bg-rose-500';
+            case 'delivered_approval_pending': return 'bg-indigo-500';
+            default: return 'bg-indigo-500';
+          }
+        };
+
+        const fetchSfcStatus = async (order, force = false) => {
+          if (!order || !order.cnNumber) return null;
+          const cn = String(order.cnNumber).trim();
+          if (!cn) return null;
+
+          if (sfcLoadingMap.value[order.id]) return;
+          if (!force && sfcDeliveryStatuses.value[order.id]) return sfcDeliveryStatuses.value[order.id];
+
+          sfcLoadingMap.value[order.id] = true;
+          try {
+            const res = await fetch(`/api/steadfast/status/${encodeURIComponent(cn)}`);
+            if (res.ok) {
+              const data = await res.json();
+              sfcDeliveryStatuses.value[order.id] = data;
+              if (data && data.delivery_status && data.delivery_status !== 'not_found') {
+                order.sfcDeliveryStatus = data.delivery_status;
+              }
+              // Manual delivery charge (no auto steadfast sync)
+              let chargeChanged = false;
+              if (data && data.cod_fee !== undefined && data.cod_fee !== null) {
+                const newCod = Number(data.cod_fee);
+                if (order.codCharge !== newCod) {
+                  order.codCharge = newCod;
+                  chargeChanged = true;
+                }
+              }
+              
+              if (chargeChanged) {
+                order.updatedAt = getBstIsoString();
+                saveOrdersLocally();
+              }
+            }
+          } catch (err) {
+            console.warn('[SFC Fetch Error]', err);
+          } finally {
+            sfcLoadingMap.value[order.id] = false;
+          }
+        };
+
+        const refreshSingleSfcStatus = async (order) => {
+          await fetchSfcStatus(order, true);
+        };
+
+        const fetchSfcStatusForOrders = async (ordersList) => {
+          const listWithCn = (ordersList || []).filter(o => o && o.cnNumber && String(o.cnNumber).trim());
+          if (listWithCn.length === 0) return;
+
+          const itemsToQuery = listWithCn.map(o => ({
+            id: o.id,
+            cnNumber: o.cnNumber
+          }));
+
+          try {
+            const res = await fetch('/api/steadfast/bulk-status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ items: itemsToQuery })
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.results) {
+                let anyUpdated = false;
+                Object.keys(data.results).forEach(orderId => {
+                  const resObj = data.results[orderId];
+                  sfcDeliveryStatuses.value[orderId] = resObj;
+                  const ord = orders.value.find(o => o.id === orderId);
+                  if (ord) {
+                    if (resObj && resObj.delivery_status && resObj.delivery_status !== 'not_found') {
+                      ord.sfcDeliveryStatus = resObj.delivery_status;
+                    }
+
+                    if (resObj && resObj.cod_fee !== undefined && resObj.cod_fee !== null) {
+                      const newCod = Number(resObj.cod_fee);
+                      if (ord.codCharge !== newCod) {
+                        ord.codCharge = newCod;
+                        anyUpdated = true;
+                      }
+                    }
+                  }
+                });
+                if (anyUpdated) {
+                  saveOrdersLocally();
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('[SFC Bulk Status Error]', err);
+          }
+        };
+
         // --- FABRICS ---
         const addFabric = () => {
           if (newFabricName.value && !fabrics.value.includes(newFabricName.value)) {
@@ -4955,7 +4893,7 @@ const executeBulkFactoryDispatch = async () => {
 
         // --- CSV EXPORT ---
         const exportCSV = () => {
-          const headers = ['Order ID', 'CN Number', 'Timestamp', 'Merchant', 'Customer Name', 'Phone', 'Shipping Address', 'Source', 'Design Code', 'Product', 'Seat Config', 'Fulfillment', 'COD Amount (BDT)', 'Delivery Amount (BDT)', 'Net Sale Amount (BDT)', 'Pipeline Status', 'Urgent Flag', 'Local Attachment Path', 'Notes'];
+          const headers = ['Order ID', 'CN Number', 'Timestamp', 'Merchant', 'Customer Name', 'Phone', 'Shipping Address', 'Source', 'Design Code', 'Product', 'Seat Config', 'Fulfillment', 'Sale Price (BDT)', 'Delivery Charge (BDT)', 'Total Price (BDT)', 'Pipeline Status', 'Urgent Flag', 'Local Attachment Path', 'Notes'];
           
           const rows = orders.value.map(o => [
             `"${o.id}"`,
@@ -4970,9 +4908,9 @@ const executeBulkFactoryDispatch = async () => {
             `"${o.productCategory}"`,
             `"${o.seatConfig}"`,
             `"${o.fulfillmentMethod}"`,
-            o.codAmount || o.totalAmount || ((Number(o.saleAmount) || 0) + (Number(o.deliveryCharge) || 0)),
-            Number(o.deliveryCharge) || 0,
-            o.saleAmount !== undefined ? o.saleAmount : Math.max(0, (o.codAmount || o.totalAmount || 0) - (Number(o.deliveryCharge) || 0)),
+            o.saleAmount,
+            o.deliveryCharge,
+            o.totalAmount,
             `"${o.status}"`,
             o.urgent ? 'YES' : 'NO',
             `"${o.collagePhotoFileName || ''}"`,
@@ -4999,21 +4937,14 @@ const executeBulkFactoryDispatch = async () => {
           }
           modalData.title = `Edit Order: ${order.id}`;
           const initialDelivery = (order.deliveryCharge !== undefined && order.deliveryCharge !== null && !isNaN(Number(order.deliveryCharge))) ? Number(order.deliveryCharge) : 0;
-          const initialCod = (order.codAmount !== undefined && order.codAmount !== null && !isNaN(Number(order.codAmount)))
-            ? Number(order.codAmount)
-            : ((order.totalAmount !== undefined && order.totalAmount !== null && !isNaN(Number(order.totalAmount)))
-                ? Number(order.totalAmount)
-                : ((Number(order.saleAmount) || 0) + initialDelivery));
-          const initialSale = (order.saleAmount !== undefined && order.saleAmount !== null && !isNaN(Number(order.saleAmount)))
-            ? Number(order.saleAmount)
-            : Math.max(0, initialCod - initialDelivery);
+          const initialTotal = (order.totalAmount !== undefined && order.totalAmount !== null && !isNaN(Number(order.totalAmount))) ? Number(order.totalAmount) : 0;
+          const initialSale = (order.saleAmount !== undefined && order.saleAmount !== null && !isNaN(Number(order.saleAmount))) ? Number(order.saleAmount) : Math.max(0, initialTotal - initialDelivery);
 
           modalData.order = reactive({
             ...order,
-            codAmount: initialCod,
             saleAmount: initialSale,
             deliveryCharge: initialDelivery,
-            totalAmount: initialCod
+            totalAmount: initialTotal > 0 ? initialTotal : (initialSale + initialDelivery)
           });
           selectedCollageTile.value = 'modal';
           activeModal.value = 'editOrder';
@@ -5021,28 +4952,22 @@ const executeBulkFactoryDispatch = async () => {
 
         const setEditOrderDeliveryCharge = (charge) => {
           if (!modalData.order) return;
-          const del = Number(charge) || 0;
-          modalData.order.deliveryCharge = del;
-          const cod = Number(modalData.order.codAmount !== undefined ? modalData.order.codAmount : modalData.order.totalAmount) || 0;
-          modalData.order.codAmount = cod;
-          modalData.order.totalAmount = cod;
-          modalData.order.saleAmount = Math.max(0, cod - del);
+          modalData.order.deliveryCharge = Number(charge) || 0;
+          const sale = Number(modalData.order.saleAmount) || 0;
+          modalData.order.totalAmount = sale + modalData.order.deliveryCharge;
         };
 
         const onEditOrderSaleOrDeliveryChange = () => {
           if (!modalData.order) return;
-          const cod = Number(modalData.order.codAmount !== undefined ? modalData.order.codAmount : modalData.order.totalAmount) || 0;
+          const sale = Number(modalData.order.saleAmount) || 0;
           const del = Number(modalData.order.deliveryCharge) || 0;
-          modalData.order.codAmount = cod;
-          modalData.order.totalAmount = cod;
-          modalData.order.saleAmount = Math.max(0, cod - del);
+          modalData.order.totalAmount = sale + del;
         };
 
         const onEditOrderTotalChange = () => {
           if (!modalData.order) return;
           const total = Number(modalData.order.totalAmount) || 0;
           const del = Number(modalData.order.deliveryCharge) || 0;
-          modalData.order.codAmount = total;
           modalData.order.saleAmount = Math.max(0, total - del);
         };
 
@@ -5061,12 +4986,11 @@ const executeBulkFactoryDispatch = async () => {
               }
             }
             const del = Number(modalData.order.deliveryCharge) || 0;
-            const cod = Number(modalData.order.codAmount !== undefined ? modalData.order.codAmount : modalData.order.totalAmount) || 0;
-            const sale = Math.max(0, cod - del);
+            const sale = Number(modalData.order.saleAmount) || Math.max(0, (Number(modalData.order.totalAmount) || 0) - del);
+            const total = sale + del;
             modalData.order.deliveryCharge = del;
-            modalData.order.codAmount = cod;
-            modalData.order.totalAmount = cod;
             modalData.order.saleAmount = sale;
+            modalData.order.totalAmount = total;
             modalData.order.updatedAt = getBstIsoString();
             modalData.order.updatedBy = currentUser.value?.username || 'user';
             orders.value[idx] = { ...modalData.order };
@@ -6441,8 +6365,6 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           fetchSfcStatus,
           refreshSingleSfcStatus,
           fetchSfcStatusForOrders,
-          sfcConnectionStatus,
-          testSteadfastConnection,
           fraudCheckMap,
           fraudLoadingMap,
           normalizeCustomerPhone,
