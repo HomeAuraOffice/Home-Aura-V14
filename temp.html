@@ -1,0 +1,106 @@
+
+                        <div
+                          v-if="modalData.order.collagePhotoLocalUrl || modalData.order.collagePhotoUrl"
+                          class="space-y-2"
+                        >
+                          <div
+                            class="relative group bg-slate-950 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 aspect-video flex items-center justify-center cursor-pointer"
+                            @click="openPhotoModal(getProxiedUrl(modalData.order.collagePhotoUrl), 'Collage Photo - Order #' + modalData.order.id)"
+                          >
+                            <img
+                              referrerpolicy="no-referrer"
+                              :src="getProxiedUrl(modalData.order.collagePhotoLocalUrl || modalData.order.collagePhotoUrl)"
+                              class="max-h-full object-contain group-hover:scale-105 transition-transform"
+                            />
+                          </div>
+                        </div>
+                        <div
+                          v-if="modalData.order.dispatchManifestUrl"
+                          class="space-y-2 mt-4"
+                        >
+                          <label
+                            class="block font-semibold text-slate-700 dark:text-slate-300"
+                            >Dispatch Manifest</label
+                          >
+                          <div
+                            class="h-32 bg-slate-100 dark:bg-slate-900 rounded-xl flex items-center justify-center overflow-hidden cursor-pointer group border border-slate-200 dark:border-slate-800"
+                            @click="openPhotoModal(getProxiedUrl(modalData.order.dispatchManifestUrl), 'Dispatch Manifest - Order #' + modalData.order.id)"
+                          >
+                            <img
+                              referrerpolicy="no-referrer"
+                              :src="getProxiedUrl(modalData.order.dispatchManifestUrl)"
+                              class="max-h-full object-contain group-hover:scale-105 transition-transform"
+                            />
+                            <div
+                              class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1"
+                            >
+                              Click to Enlarge
+                            </div>
+                          </div>
+                          <div
+                            class="text-[10px] font-mono text-slate-500 dark:text-slate-400 truncate"
+                            :title="modalData.order.collagePhotoFileName"
+                          >
+                            {{ modalData.order.collagePhotoFileName ||
+                            'collage_attachment.png' }}
+                          </div>
+                        </div>
+                        <div
+                          v-else
+                          class="p-4 text-center text-slate-400 dark:text-slate-500 text-[11px] italic bg-white dark:bg-slate-900 rounded-lg border border-dashed border-slate-200 dark:border-slate-800"
+                        >
+                          No collage photo attached.
+                        </div>
+                      </div>
+
+                      <!-- 2. Social Media Proof Chat Screenshot Card -->
+                      <div
+                        class="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl space-y-2"
+                      >
+                        <div class="flex items-center justify-between">
+                          <span
+                            class="font-bold text-slate-800 dark:text-slate-200"
+                          >
+                            Social Chat Proof</span
+                          >
+                          <span
+                            v-if="modalData.order.socialProofUrl"
+                            class="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[9px] font-extrabold rounded-full border border-emerald-200 dark:border-emerald-800"
+                            >Proof Attached</span
+                          >
+                          <span
+                            v-else
+                            class="px-2 py-0.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 text-[9px] font-medium rounded-full"
+                            >Not Uploaded</span
+                          >
+                        </div>
+
+                        <div
+                          v-if="modalData.order.socialProofUrl"
+                          class="space-y-2"
+                        >
+                          <div
+                            class="relative group bg-slate-950 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 aspect-video flex items-center justify-center cursor-pointer"
+                            @click="openPhotoModal(getProxiedUrl(modalData.order.socialProofUrl), 'Chat Proof - Order #' + modalData.order.id)"
+                          >
+                            <img
+                              referrerpolicy="no-referrer"
+                              :src="getProxiedUrl(modalData.order.socialProofUrl)"
+                              class="max-h-full object-contain group-hover:scale-105 transition-transform"
+                            />
+                            <div
+                              class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1"
+                            >
+                              Click to Enlarge
+                            </div>
+                          </div>
+                          <div
+                            class="text-[10px] font-mono text-emerald-700 dark:text-emerald-400 truncate"
+                            :title="modalData.order.socialProofFileName"
+                          >
+                            ️ {{ modalData.order.socialProofFileName ||
+                            'chat_proof_screenshot.png' }}
+                          </div>
+                        </div>
+                        <div
+                          v-else

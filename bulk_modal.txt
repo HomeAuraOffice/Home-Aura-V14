@@ -1,0 +1,91 @@
+            <!-- BULK FACTORY DISPATCH MODAL -->
+            <div v-if="activeModal === 'bulkDispatchModal'" class="space-y-5 text-xs">
+              <div class="flex items-center gap-3 p-3.5 bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/40 dark:to-blue-950/40 rounded-2xl border border-indigo-100 dark:border-indigo-900/50">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white flex items-center justify-center font-bold text-xl shrink-0 shadow-lg shadow-indigo-600/20">
+                  
+                </div>
+                <div>
+                  <h3 class="text-sm font-extrabold text-indigo-950 dark:text-indigo-100 tracking-tight">Bulk Dispatch & Manifest Generation</h3>
+                  <p class="text-[11px] text-indigo-700/80 dark:text-indigo-300/80 mt-0.5 leading-snug">
+                    Submitting <strong>{{ bulkDispatchData.orders.length }} selected orders</strong>. All attached collages will be instantly merged into a high-res single PNG manifest and pushed to Drive.
+                  </p>
+                </div>
+              </div>
+
+              <div class="space-y-4 px-1">
+                <!-- Factory Selection -->
+                <div>
+                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                    <span> Target Factory Destination</span>
+                    <span class="text-[10px] text-slate-400 font-normal">AI Ranked</span>
+                  </label>
+                  <div class="relative">
+                    <select v-model="bulkDispatchData.selectedFactoryId" class="w-full appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-3 pl-3 pr-10 rounded-xl font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-shadow shadow-sm cursor-pointer">
+                      <option v-for="f in rankedFactories" :key="f.id" :value="f.id">
+                        {{ f.name }} (Rank #{{ rankedFactories.indexOf(f)+1 }} • Fabric: {{ f.fabricQuality }}★ • {{ f.pendingCount }} Pending)
+                      </option>
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-slate-400">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Selected Orders Preview List -->
+                <div>
+                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Orders Batch Summary ({{ bulkDispatchData.orders.length }} Items)
+                  </label>
+                  <div class="max-h-48 overflow-y-auto space-y-1.5 pr-1 divide-y divide-slate-100 dark:divide-slate-800/60 bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-inner">
+                    <div v-for="ord in bulkDispatchData.orders" :key="ord.id" class="pt-1.5 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div class="flex items-center gap-2">
+                        <span class="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-[11px]">{{ ord.id }}</span>
+                        <span class="font-bold text-slate-800 dark:text-slate-200">{{ ord.fabric }}</span>
+                        <span class="text-[10px] text-slate-500">({{ ord.productCategory }})</span>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span v-if="ord.collagePhotoLocalUrl || ord.collagePhotoUrl" class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                          Ready
+                        </span>
+                        <span v-if="ord.dispatchManifestUrl" class="text-[10px] text-purple-600 dark:text-purple-400 font-bold bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800 flex items-center gap-1 cursor-pointer hover:bg-purple-100" @click.stop="openPhotoModal(getProxiedUrl(ord.dispatchManifestUrl), 'Dispatch Manifest')">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                          Manifest
+                        </span>
+                        <span v-else class="text-[10px] text-slate-400 font-medium">No Image</span>
+                        <span class="font-extrabold text-slate-900 dark:text-slate-100 ml-1">৳{{ (ord.totalAmount || 0).toLocaleString() }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Notice about WhatsApp clipboard workflow -->
+                <div class="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200 dark:border-amber-800/50 text-[11px] text-amber-800 dark:text-amber-200 flex items-start gap-2.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-amber-500 mt-0.5 shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                  <div>
+                    <strong class="font-extrabold tracking-tight">Automated WhatsApp & Drive Workflow</strong>
+                    <div class="mt-0.5 leading-relaxed opacity-90">When you click dispatch, the app merges all collages into a single composite PNG on your clipboard, uploads it to Drive, and opens the factory WhatsApp group. Just press <kbd class="px-1.5 py-0.5 bg-white dark:bg-slate-800 rounded border border-amber-300 dark:border-amber-700 font-mono text-[9px] shadow-sm font-bold">Ctrl+V</kbd> to paste!</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between gap-3 pt-5 mt-2 border-t border-slate-100 dark:border-slate-800/60">
+                <button @click="closeModal" type="button" :disabled="bulkDispatchData.isLoading" class="px-5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-xl font-bold transition-all text-xs cursor-pointer">
+                  Cancel
+                </button>
+                <button @click="executeBulkFactoryDispatch" type="button" :disabled="bulkDispatchData.isLoading" class="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-transform active:scale-95 text-xs cursor-pointer disabled:opacity-75 disabled:active:scale-100">
+                  <svg v-if="bulkDispatchData.isLoading" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                  <span v-if="bulkDispatchData.isLoading">Merging & Dispatching...</span>
+                  <span v-else>Generate Manifest & Dispatch ({{ bulkDispatchData.orders.length }})</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- BULK DISPATCH SUCCESS MODAL -->
+            <div v-if="activeModal === 'bulkDispatchSuccessModal'" class="space-y-5 text-xs">
+              <div class="text-center pt-4 pb-2">
+                <div class="w-16 h-16 rounded-[20px] bg-gradient-to-br from-emerald-400 to-emerald-600 text-white mx-auto flex items-center justify-center mb-4 shadow-xl shadow-emerald-600/30 transform transition-transform hover:scale-105">
+                  <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5l10 -10"/></svg>
+                </div>
+                <h3 class="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
