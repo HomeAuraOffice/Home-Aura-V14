@@ -2574,6 +2574,7 @@
                     queueChange('orders', realOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
+                    updateOrderCombinedPhoto(realOrder.id);
                   }
                 } else {
                   // Match in-flight order submitted before upload finished
@@ -2590,6 +2591,7 @@
                     queueChange('orders', recentOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
+                    updateOrderCombinedPhoto(recentOrder.id);
                   }
                 }
             } else if (result.error) {
@@ -2713,6 +2715,7 @@
                     queueChange('orders', realOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
+                    updateOrderCombinedPhoto(realOrder.id);
                   }
                 } else {
                   // Match in-flight order submitted before upload finished
@@ -2729,6 +2732,7 @@
                     queueChange('orders', recentOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
+                    updateOrderCombinedPhoto(recentOrder.id);
                   }
                 }
             } else if (result.error) {
@@ -2743,8 +2747,9 @@
           }
         };
 
+        const isGeneratingCombinedMap = ref({});
 
-        const uploadCompositePngToDrive = async (base64Data, filename) => {
+        const uploadCompositePngToDrive = async (base64Data, filename, folder = 'HomeAura_Dispatch_Manifests') => {
           const url = (appsScriptUrl.value || '').trim();
           if (!url || !url.startsWith('http')) return null;
           try {
@@ -2757,7 +2762,7 @@
                 action: 'upload_image',
                 filename: filename,
                 base64: base64Data,
-                folder: 'HomeAura_Dispatch_Manifests'
+                folder: folder
               }),
               signal: controller.signal
             });
@@ -2768,6 +2773,48 @@
             }
           } catch(e) {
             console.error('Failed to upload composite PNG to drive:', e);
+          }
+          return null;
+        };
+
+        const updateOrderCombinedPhoto = async (orderOrId, force = false) => {
+          if (!orderOrId) return null;
+          const orderId = typeof orderOrId === 'string' ? orderOrId : orderOrId.id;
+          if (!orderId) return null;
+          const realOrder = orders.value.find(o => o.id === orderId) || (typeof orderOrId === 'object' ? orderOrId : null);
+          if (!realOrder) return null;
+
+          const hasCollage = !!(realOrder.collagePhotoLocalUrl || realOrder.collagePhotoUrl);
+          const hasProof = !!(realOrder.socialProofLocalUrl || realOrder.socialProofUrl);
+
+          if (!hasCollage && !hasProof && !force) {
+            return null;
+          }
+
+          isGeneratingCombinedMap.value[orderId] = true;
+          try {
+            const compositeData = await generateOrdersCompositePng([realOrder], 'HOMEAURA ORDER MANIFEST');
+            if (compositeData && compositeData.dataUrl) {
+              const autoCn = realOrder.cnNumber || realOrder.id;
+              const fileName = `combined_${String(autoCn).replace(/[^a-zA-Z0-9-]/g, '')}_${Date.now()}.jpg`;
+              const uploadedUrl = await uploadCompositePngToDrive(compositeData.dataUrl, fileName, 'HomeAura_Order_Composites');
+              if (uploadedUrl) {
+                realOrder.combinedDriveUrl = uploadedUrl;
+                if (modalData.order && modalData.order.id === orderId) {
+                  modalData.order.combinedDriveUrl = uploadedUrl;
+                }
+                realOrder.updatedAt = getBstIsoString();
+                realOrder.updatedBy = currentUser.value?.username || 'system';
+                queueChange('orders', realOrder);
+                saveOrdersLocally();
+                triggerAutoSync(true);
+                return uploadedUrl;
+              }
+            }
+          } catch (err) {
+            console.warn('[Update Order Combined Photo Error]', err);
+          } finally {
+            isGeneratingCombinedMap.value[orderId] = false;
           }
           return null;
         };
@@ -5420,6 +5467,8 @@ const executeBulkFactoryDispatch = async () => {
             if (orders.value[idx].customerPhone) {
               fetchFraudCheck(orders.value[idx].customerPhone, false);
             }
+            // Auto update combined photo when attachments are modified or added
+            updateOrderCombinedPhoto(orders.value[idx].id);
           }
           closeModal();
         };
@@ -6847,6 +6896,8 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           isLoadingTracking,
           openPhotoModal,
           openOriginalImage,
+          updateOrderCombinedPhoto,
+          isGeneratingCombinedMap,
           closeModal,
           openGlobalConfirm,
           adminWaGroupLink,
