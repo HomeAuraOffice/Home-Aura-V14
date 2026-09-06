@@ -1432,6 +1432,7 @@
             if (copy.socialProofUrl && (copy.socialProofUrl.startsWith('data:') || copy.socialProofUrl.startsWith('blob:'))) {
               copy.socialProofUrl = '';
             }
+            copy.factoryTag = copy.factoryTag || '';
             return copy;
           });
 
@@ -1628,9 +1629,24 @@
                     const remTime = remoteOrd.updatedAt ? new Date(remoteOrd.updatedAt).getTime() : 0;
                     if (remTime >= locTime || !localOrd.updatedAt) {
                       const prevStatus = localOrd.status;
+                      const preservedLocalFactoryTag = localOrd.factoryTag || '';
                       Object.assign(localOrd, remoteOrd);
+                      // Preserve existing factory tag if remote was missing or blank
+                      if (!localOrd.factoryTag && preservedLocalFactoryTag) {
+                        localOrd.factoryTag = preservedLocalFactoryTag;
+                      }
                       if (prevStatus !== remoteOrd.status) updatedCount++;
                     }
+                  } else {
+                    // Retain factoryTag in pending local changes
+                    if (localOrd.factoryTag && syncQueue.value.changes.orders[localOrd.id]) {
+                      syncQueue.value.changes.orders[localOrd.id].factoryTag = localOrd.factoryTag;
+                    }
+                  }
+                  
+                  // Ensure remote factoryTag updates local if local has none
+                  if (remoteOrd.factoryTag && !localOrd.factoryTag) {
+                    localOrd.factoryTag = remoteOrd.factoryTag;
                   }
                   
                   // Ensure photo Google Drive URLs and file names from remote are always preserved and merged
@@ -2801,7 +2817,26 @@
             order.updatedBy = currentUser.value?.username || 'seller';
             queueChange('orders', order);
             saveOrdersLocally();
+            triggerAutoSync(true);
           }
+        };
+
+        const updateOrderFactory = (order, newFactoryName) => {
+          if (!order) return;
+          const targetOrder = orders.value.find(o => o.id === order.id) || order;
+          const newTag = (newFactoryName || '').trim();
+          targetOrder.factoryTag = newTag;
+          targetOrder.updatedAt = getBstIsoString();
+          targetOrder.updatedBy = currentUser.value?.username || 'admin';
+          queueChange('orders', targetOrder);
+          saveOrdersLocally();
+          triggerAutoSync(true);
+          syncNotice.value = `🏭 Factory tag "${newTag || 'Unassigned'}" assigned to ${targetOrder.id} & synced to Google Sheets!`;
+          setTimeout(() => {
+            if (syncNotice.value && syncNotice.value.includes(targetOrder.id)) {
+              syncNotice.value = '';
+            }
+          }, 4000);
         };
 
         // --- DYNAMIC FACTORY PRIORITY ENGINE ---
@@ -3287,11 +3322,35 @@
         // --- SELLER (MY ORDERS) PAGINATION & SEARCH ENGINE ---
         const myOrderSearch = ref('');
         const myOrderStatusFilter = ref('ALL');
+        const myOrderSortOption = ref('NEWEST');
         const myOrdersPerPage = ref(20);
         const myOrdersCurrentPage = ref(1);
 
+        const parseOrderTime = (o) => {
+          if (!o) return 0;
+          if (o.timestamp) {
+            const t = new Date(o.timestamp).getTime();
+            if (!isNaN(t)) return t;
+          }
+          if (o.createdAt) {
+            const t = new Date(o.createdAt).getTime();
+            if (!isNaN(t)) return t;
+          }
+          if (o.updatedAt) {
+            const t = new Date(o.updatedAt).getTime();
+            if (!isNaN(t)) return t;
+          }
+          return 0;
+        };
+
+        const extractOrderNum = (id) => {
+          if (!id) return 0;
+          const num = String(id).replace(/\D/g, '');
+          return num ? parseInt(num, 10) : 0;
+        };
+
         const filteredMyOrders = computed(() => {
-          return myOrders.value.filter(o => {
+          let result = myOrders.value.filter(o => {
             if (myOrderStatusFilter.value !== 'ALL' && o.status !== myOrderStatusFilter.value) return false;
             if (myOrderSearch.value) {
               const q = myOrderSearch.value.toLowerCase();
@@ -3305,6 +3364,51 @@
             }
             return true;
           });
+
+          if (myOrderSortOption.value === 'NEWEST') {
+            result.sort((a, b) => {
+              const timeDiff = parseOrderTime(b) - parseOrderTime(a);
+              if (timeDiff !== 0) return timeDiff;
+              const numDiff = extractOrderNum(b.id) - extractOrderNum(a.id);
+              if (numDiff !== 0) return numDiff;
+              return String(b.id || '').localeCompare(String(a.id || ''));
+            });
+          } else if (myOrderSortOption.value === 'OLDEST') {
+            result.sort((a, b) => {
+              const timeDiff = parseOrderTime(a) - parseOrderTime(b);
+              if (timeDiff !== 0) return timeDiff;
+              const numDiff = extractOrderNum(a.id) - extractOrderNum(b.id);
+              if (numDiff !== 0) return numDiff;
+              return String(a.id || '').localeCompare(String(b.id || ''));
+            });
+          } else if (myOrderSortOption.value === 'SERIAL_DESC') {
+            result.sort((a, b) => {
+              const numDiff = extractOrderNum(b.id) - extractOrderNum(a.id);
+              if (numDiff !== 0) return numDiff;
+              return String(b.id || '').localeCompare(String(a.id || ''));
+            });
+          } else if (myOrderSortOption.value === 'SERIAL_ASC') {
+            result.sort((a, b) => {
+              const numDiff = extractOrderNum(a.id) - extractOrderNum(b.id);
+              if (numDiff !== 0) return numDiff;
+              return String(a.id || '').localeCompare(String(b.id || ''));
+            });
+          } else if (myOrderSortOption.value === 'URGENT') {
+            result.sort((a, b) => {
+              const urgA = a.urgent ? 1 : 0;
+              const urgB = b.urgent ? 1 : 0;
+              if (urgB !== urgA) return urgB - urgA;
+              return parseOrderTime(b) - parseOrderTime(a);
+            });
+          } else if (myOrderSortOption.value === 'STATUS') {
+            result.sort((a, b) => {
+              const idxA = pipelineStages.indexOf(a.status);
+              const idxB = pipelineStages.indexOf(b.status);
+              return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+            });
+          }
+
+          return result;
         });
 
         const totalMyOrderPages = computed(() => {
@@ -3369,7 +3473,7 @@
           }
         };
 
-        watch([myOrderSearch, myOrderStatusFilter, myOrdersPerPage], () => {
+        watch([myOrderSearch, myOrderStatusFilter, myOrdersPerPage, myOrderSortOption], () => {
           myOrdersCurrentPage.value = 1;
         });
 
@@ -4618,6 +4722,7 @@ const executeWhatsAppDispatch = async () => {
             realOrder.updatedBy = currentUser.value?.username || 'user';
             queueChange('orders', realOrder);
             saveOrdersLocally();
+            triggerAutoSync(true);
           }
 
           const messageText = getWhatsAppPayloadText(order, modalData.selectedFactoryId);
@@ -4861,6 +4966,7 @@ const executeBulkFactoryDispatch = async () => {
             queueChange('orders', ord);
           });
           saveOrdersLocally();
+          triggerAutoSync(true);
 
           // Calculate WA URL
           const encodedMessage = encodeURIComponent(manifestText);
@@ -5772,8 +5878,17 @@ function mergeObjectsByIdLWW(sheetName, incomingObjects) {
       var incTime = incObj.updatedAt ? new Date(incObj.updatedAt).getTime() : 0;
       var extTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
       if (incTime >= extTime || !extTime) {
+        if ((incObj.factoryTag === undefined || incObj.factoryTag === '' || incObj.factoryTag === null) && existing.factoryTag) {
+          incObj.factoryTag = existing.factoryTag;
+        }
         map[key] = Object.assign({}, existing, incObj);
         updatedCount++;
+      } else {
+        if (incObj.factoryTag && !existing.factoryTag) {
+          existing.factoryTag = incObj.factoryTag;
+          map[key] = existing;
+          updatedCount++;
+        }
       }
     }
   });
@@ -6669,6 +6784,7 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           isPageAllSelected,
           myOrderSearch,
           myOrderStatusFilter,
+          myOrderSortOption,
           filteredMyOrders,
           myOrdersPerPage,
           myOrdersCurrentPage,
@@ -6680,6 +6796,7 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           setMyOrderPage,
           prevMyOrderPage,
           nextMyOrderPage,
+          updateOrderFactory,
           formatBDT,
           handleLogin,
           handleLogout,

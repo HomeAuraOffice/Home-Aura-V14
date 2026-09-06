@@ -3083,17 +3083,33 @@
                             >
                               {{ ord.fulfillmentMethod }}
                             </div>
-                            <div
-                              v-if="ord.factoryTag"
-                              class="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-900 px-1.5 py-0.5 rounded inline-block mt-0.5"
-                            >
-                              {{ ord.factoryTag }}
+                            <div v-if="currentUser && currentUser.role === 'admin'" class="mt-1">
+                              <select
+                                :value="ord.factoryTag || ''"
+                                @change="updateOrderFactory(ord, $event.target.value)"
+                                class="text-[10px] font-bold rounded-lg px-2 py-1 border transition-all cursor-pointer focus:outline-none max-w-[155px] truncate select-none shadow-2xs"
+                                :class="ord.factoryTag ? 'bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:border-indigo-400' : 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 hover:border-amber-400'"
+                                title="Assign/Update factory partner (Auto-syncs immediately to Google Sheets)"
+                              >
+                                <option value="">⚠️ No Factory Assigned</option>
+                                <option v-for="f in factories" :key="f.id" :value="f.name">
+                                  🏭 {{ f.name }}
+                                </option>
+                              </select>
                             </div>
-                            <div
-                              v-else
-                              class="text-[10px] text-slate-400 italic mt-0.5"
-                            >
-                              Unassigned Factory
+                            <div v-else>
+                              <div
+                                v-if="ord.factoryTag"
+                                class="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-900 px-1.5 py-0.5 rounded inline-block mt-0.5"
+                              >
+                                🏭 {{ ord.factoryTag }}
+                              </div>
+                              <div
+                                v-else
+                                class="text-[10px] text-slate-400 italic mt-0.5"
+                              >
+                                Unassigned Factory
+                              </div>
                             </div>
                           </td>
 
@@ -6123,10 +6139,10 @@
                     </p>
                   </div>
 
-                  <!-- Seller Search & Filter & Page Limit -->
+                  <!-- Seller Search & Filter & Page Limit & Sort -->
                   <div class="flex flex-wrap items-center gap-2.5">
                     <!-- Search -->
-                    <div class="relative w-full sm:w-56">
+                    <div class="relative w-full sm:w-52">
                       <svg
                         class="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400 dark:text-slate-500"
                         fill="none"
@@ -6159,6 +6175,25 @@
                       </option>
                     </select>
 
+                    <!-- Sort Engine (Newest First / Serialized) -->
+                    <div class="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <svg class="w-3.5 h-3.5 text-indigo-500 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                      </svg>
+                      <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Sort:</span>
+                      <select
+                        v-model="myOrderSortOption"
+                        class="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none cursor-pointer"
+                      >
+                        <option value="NEWEST">⚡ Newest First (Latest)</option>
+                        <option value="OLDEST">⏳ Oldest First</option>
+                        <option value="SERIAL_DESC">🔢 Order ID (High → Low)</option>
+                        <option value="SERIAL_ASC">🔢 Order ID (Low → High)</option>
+                        <option value="URGENT">🔥 Urgent First</option>
+                        <option value="STATUS">📊 By Status Flow</option>
+                      </select>
+                    </div>
+
                     <!-- Page Size Selector -->
                     <div class="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
                       <span class="text-[11px] font-bold text-slate-500 dark:text-slate-400">Page:</span>
@@ -6186,7 +6221,7 @@
                         <tr
                           class="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider"
                         >
-                          <th class="p-4">Order ID & Date</th>
+                          <th class="p-4">SL# & Order ID</th>
                           <th class="p-4">Customer & CN</th>
                           <th class="p-4">Code & Source</th>
                           <th class="p-4">Product & Collage</th>
@@ -6198,14 +6233,17 @@
                         class="divide-y divide-slate-100 dark:divide-slate-800 text-xs"
                       >
                         <tr
-                          v-for="ord in paginatedMyOrders"
+                          v-for="(ord, index) in paginatedMyOrders"
                           :key="ord.id"
                           :class="ord.urgent ? 'urgent-glow-row' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'"
                         >
                           <td
                             class="p-4 whitespace-nowrap font-bold text-slate-900 dark:text-slate-100"
                           >
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                              <span class="text-[10px] font-mono font-extrabold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                #{{ (myOrdersCurrentPage - 1) * myOrdersPerPage + index + 1 }}
+                              </span>
                               <span>{{ ord.id }}</span>
                               <span
                                 v-if="ord.urgent"

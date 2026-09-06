@@ -295,8 +295,17 @@ function mergeObjectsByIdLWW(sheetName, incomingObjects) {
       
       if (incTime >= extTime || !extTime) {
         // Incoming is newer or equal -> update fields cleanly
+        if ((incObj.factoryTag === undefined || incObj.factoryTag === '' || incObj.factoryTag === null) && existing.factoryTag) {
+          incObj.factoryTag = existing.factoryTag;
+        }
         map[key] = Object.assign({}, existing, incObj);
         updatedCount++;
+      } else {
+        if (incObj.factoryTag && !existing.factoryTag) {
+          existing.factoryTag = incObj.factoryTag;
+          map[key] = existing;
+          updatedCount++;
+        }
       }
     }
   });
