@@ -134,7 +134,10 @@ async function startServer() {
   const STEADFAST_SECRET_KEY = process.env.STEADFAST_SECRET_KEY || '7ksaufrn6qqjhxpk0prsugls';
   const STEADFAST_BASE_URL = 'https://portal.packzy.com/api/v1';
 
-  // In-memory cache for Steadfast status queries (30 seconds TTL)
+  // In-memory cache for Steadfast status queries with multi-tier TTL
+  // - Terminal status ('delivered', 'cancelled'): 24 hours
+  // - Active status ('in_transit', 'pending', etc.): 10 minutes
+  // - Not found: 5 minutes
   const sfcCache = new Map<string, { data: any; expiresAt: number }>();
 
   async function fetchWithTimeout(url: string, options: any, timeoutMs = 6000) {
@@ -154,7 +157,11 @@ async function startServer() {
     const rawCn = (cnNumber !== undefined && cnNumber !== null ? String(cnNumber) : '').trim();
     const rawTrack = (trackingCode !== undefined && trackingCode !== null ? String(trackingCode) : '').trim();
     
-    const cacheKey = `${rawCn}||${rawTrack}`;
+    if (!rawCn && !rawTrack) {
+      return { success: false, delivery_status: 'not_found', message: 'No CN or tracking provided' };
+    }
+
+    const cacheKey = `${rawCn.toLowerCase()}||${rawTrack.toLowerCase()}`;
     const cached = sfcCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data;
@@ -166,105 +173,111 @@ async function startServer() {
       'Content-Type': 'application/json'
     };
 
-    // Candidates for CID lookup
-    const cidCandidates: string[] = [];
-    if (rawCn) {
-      cidCandidates.push(rawCn);
-      const digitsOnly = rawCn.replace(/^[^\d]+/, '').trim();
-      if (digitsOnly && digitsOnly !== rawCn) {
-        cidCandidates.push(digitsOnly);
+    const isNumericCn = /^\d+$/.test(rawCn) && rawCn.length >= 4;
+    const digitsOnly = rawCn.replace(/\D/g, '');
+
+    // Function to calculate appropriate cache TTL based on status
+    const getTtl = (status: string) => {
+      const s = (status || '').toLowerCase().trim();
+      if (s === 'delivered' || s === 'cancelled' || s === 'partial_delivered') {
+        return 24 * 60 * 60 * 1000; // 24 hours
+      }
+      if (s === 'in_transit' || s === 'pending' || s === 'in_review' || s === 'hold') {
+        return 10 * 60 * 1000; // 10 minutes
+      }
+      return 5 * 60 * 1000; // 5 minutes default
+    };
+
+    // Helper to try an endpoint across base URLs
+    const tryEndpoint = async (path: string) => {
+      const baseUrls = [STEADFAST_BASE_URL, 'https://portal.steadfast.com.bd/api/v1'];
+      for (const base of baseUrls) {
+        try {
+          const res = await fetchWithTimeout(`${base}/${path}`, { headers }, 5000);
+          if (res.ok) {
+            const json: any = await res.json();
+            if (json && (json.status === 200 || json.delivery_status)) {
+              return json;
+            }
+          }
+        } catch {
+          // ignore and continue
+        }
+      }
+      return null;
+    };
+
+    // 1. If numeric CN or digits length >= 5, try status_by_cid
+    if (isNumericCn || digitsOnly.length >= 5) {
+      const cidToTry = isNumericCn ? rawCn : digitsOnly;
+      const json = await tryEndpoint(`status_by_cid/${encodeURIComponent(cidToTry)}`);
+      if (json) {
+        const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
+        const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
+        const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
+        const result = { 
+          success: true, 
+          delivery_status: json.delivery_status || 'unknown', 
+          delivery_charge: deliveryCharge,
+          cod_fee: codFee,
+          details: json, 
+          matchedBy: 'cid', 
+          matchedId: cidToTry 
+        };
+        sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + getTtl(result.delivery_status) });
+        return result;
       }
     }
 
-    // 1. Try status_by_cid
-    for (const cid of cidCandidates) {
-      try {
-        const res = await fetchWithTimeout(`${STEADFAST_BASE_URL}/status_by_cid/${encodeURIComponent(cid)}`, { headers }, 5000);
-        if (res.ok) {
-          const json: any = await res.json();
-          if (json && (json.status === 200 || json.delivery_status)) {
-            const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
-            const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
-            const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
-            const result = { 
-              success: true, 
-              delivery_status: json.delivery_status || 'unknown', 
-              delivery_charge: deliveryCharge,
-              cod_fee: codFee,
-              details: json, 
-              matchedBy: 'cid', 
-              matchedId: cid 
-            };
-            sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + 30000 });
-            return result;
-          }
-        }
-      } catch (e) {
-        console.warn(`[SFC] CID lookup failed for ${cid}:`, e);
-      }
-    }
-
-    // 2. Try status_by_trackingcode
-    const trackCandidate = rawTrack || (rawCn.length > 5 ? rawCn : '');
-    if (trackCandidate) {
-      try {
-        const res = await fetchWithTimeout(`${STEADFAST_BASE_URL}/status_by_trackingcode/${encodeURIComponent(trackCandidate)}`, { headers }, 5000);
-        if (res.ok) {
-          const json: any = await res.json();
-          if (json && (json.status === 200 || json.delivery_status)) {
-            const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
-            const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
-            const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
-            const result = { 
-              success: true, 
-              delivery_status: json.delivery_status || 'unknown', 
-              delivery_charge: deliveryCharge,
-              cod_fee: codFee,
-              details: json, 
-              matchedBy: 'tracking_code', 
-              matchedId: trackCandidate 
-            };
-            sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + 30000 });
-            return result;
-          }
-        }
-      } catch (e) {
-        console.warn(`[SFC] Tracking lookup failed for ${trackCandidate}:`, e);
+    // 2. Try status_by_trackingcode if trackingCode exists or rawCn is alphanumeric
+    const trackToTry = rawTrack || (rawCn.length > 5 ? rawCn : '');
+    if (trackToTry) {
+      const json = await tryEndpoint(`status_by_trackingcode/${encodeURIComponent(trackToTry)}`);
+      if (json) {
+        const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
+        const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
+        const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
+        const result = { 
+          success: true, 
+          delivery_status: json.delivery_status || 'unknown', 
+          delivery_charge: deliveryCharge,
+          cod_fee: codFee,
+          details: json, 
+          matchedBy: 'tracking_code', 
+          matchedId: trackToTry 
+        };
+        sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + getTtl(result.delivery_status) });
+        return result;
       }
     }
 
     // 3. Try status_by_invoice
     const invCandidates: string[] = [];
     if (rawCn) invCandidates.push(rawCn);
+    if (digitsOnly && digitsOnly !== rawCn) invCandidates.push(digitsOnly);
+
     for (const inv of invCandidates) {
-      try {
-        const res = await fetchWithTimeout(`${STEADFAST_BASE_URL}/status_by_invoice/${encodeURIComponent(inv)}`, { headers }, 5000);
-        if (res.ok) {
-          const json: any = await res.json();
-          if (json && (json.status === 200 || json.delivery_status)) {
-            const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
-            const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
-            const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
-            const result = { 
-              success: true, 
-              delivery_status: json.delivery_status || 'unknown', 
-              delivery_charge: deliveryCharge,
-              cod_fee: codFee,
-              details: json, 
-              matchedBy: 'invoice', 
-              matchedId: inv 
-            };
-            sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + 30000 });
-            return result;
-          }
-        }
-      } catch (e) {
-        console.warn(`[SFC] Invoice lookup failed for ${inv}:`, e);
+      const json = await tryEndpoint(`status_by_invoice/${encodeURIComponent(inv)}`);
+      if (json) {
+        const rawCharge = json.delivery_charge !== undefined ? json.delivery_charge : (json.delivery_fee !== undefined ? json.delivery_fee : (json.charge !== undefined ? json.charge : (json.parcel && json.parcel.delivery_charge !== undefined ? json.parcel.delivery_charge : undefined)));
+        const deliveryCharge = rawCharge !== undefined ? Number(rawCharge) : undefined;
+        const codFee = json.cod_fee !== undefined ? Number(json.cod_fee) : (json.cod_charge !== undefined ? Number(json.cod_charge) : undefined);
+        const result = { 
+          success: true, 
+          delivery_status: json.delivery_status || 'unknown', 
+          delivery_charge: deliveryCharge,
+          cod_fee: codFee,
+          details: json, 
+          matchedBy: 'invoice', 
+          matchedId: inv 
+        };
+        sfcCache.set(cacheKey, { data: result, expiresAt: Date.now() + getTtl(result.delivery_status) });
+        return result;
       }
     }
 
     const notFoundResult = { success: false, delivery_status: 'not_found', message: 'No active Steadfast record found' };
-    sfcCache.set(cacheKey, { data: notFoundResult, expiresAt: Date.now() + 20000 });
+    sfcCache.set(cacheKey, { data: notFoundResult, expiresAt: Date.now() + (5 * 60 * 1000) });
     return notFoundResult;
   }
 
@@ -298,21 +311,35 @@ async function startServer() {
         return res.status(400).json({ error: 'items must be an array' });
       }
       const results: Record<string, any> = {};
-      const batch = items.slice(0, 100);
+      const batch = items.slice(0, 250);
       
-      // Throttled processing to avoid Steadfast rate-limits (concurrency: 3)
-      const chunkSize = 3;
-      for (let i = 0; i < batch.length; i += chunkSize) {
-        const chunk = batch.slice(i, i + chunkSize);
+      // Separate items already in cache vs items needing remote fetch
+      const pendingFetch: any[] = [];
+      for (const item of batch) {
+        if (!item || !item.id) continue;
+        const rawCn = (item.cnNumber !== undefined && item.cnNumber !== null ? String(item.cnNumber) : '').trim();
+        const rawTrack = (item.trackingCode !== undefined && item.trackingCode !== null ? String(item.trackingCode) : '').trim();
+        const cacheKey = `${rawCn.toLowerCase()}||${rawTrack.toLowerCase()}`;
+        const cached = sfcCache.get(cacheKey);
+        if (cached && cached.expiresAt > Date.now()) {
+          results[item.id] = cached.data;
+        } else {
+          pendingFetch.push(item);
+        }
+      }
+
+      // Throttled processing with concurrency: 4 for uncached items
+      const chunkSize = 4;
+      for (let i = 0; i < pendingFetch.length; i += chunkSize) {
+        const chunk = pendingFetch.slice(i, i + chunkSize);
         await Promise.all(
           chunk.map(async (item: any) => {
-            if (!item || !item.id) return;
             const status = await querySteadfastStatus(item.cnNumber, item.trackingCode);
             results[item.id] = status;
           })
         );
-        if (i + chunkSize < batch.length) {
-          await new Promise(r => setTimeout(r, 200));
+        if (i + chunkSize < pendingFetch.length) {
+          await new Promise(r => setTimeout(r, 120));
         }
       }
       

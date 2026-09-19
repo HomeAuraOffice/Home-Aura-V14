@@ -1433,6 +1433,7 @@
               copy.socialProofUrl = '';
             }
             copy.factoryTag = copy.factoryTag || '';
+            copy.sfcDeliveryStatus = copy.sfcDeliveryStatus || '';
             return copy;
           });
 
@@ -1663,6 +1664,20 @@
                     localOrd.socialProofFileName = remoteOrd.socialProofFileName;
                   }
 
+                  // Reconcile and preserve Steadfast Courier Delivery Status
+                  if (remoteOrd.sfcDeliveryStatus) {
+                    if (!localOrd.sfcDeliveryStatus || localOrd.sfcDeliveryStatus !== remoteOrd.sfcDeliveryStatus) {
+                      localOrd.sfcDeliveryStatus = remoteOrd.sfcDeliveryStatus;
+                    }
+                    if (!sfcDeliveryStatuses.value[localOrd.id] || sfcDeliveryStatuses.value[localOrd.id].delivery_status !== remoteOrd.sfcDeliveryStatus) {
+                      sfcDeliveryStatuses.value[localOrd.id] = { delivery_status: remoteOrd.sfcDeliveryStatus, success: true };
+                    }
+                  } else if (localOrd.sfcDeliveryStatus) {
+                    if (!sfcDeliveryStatuses.value[localOrd.id]) {
+                      sfcDeliveryStatuses.value[localOrd.id] = { delivery_status: localOrd.sfcDeliveryStatus, success: true };
+                    }
+                  }
+
                   // Merge Fraud Assessment from remote orders into local state
                   if (remoteOrd.fraudData) {
                     let fData = remoteOrd.fraudData;
@@ -1694,6 +1709,9 @@
                         fraudCheckMap.value[pKey] = fData;
                       }
                     }
+                  }
+                  if (remoteOrd.sfcDeliveryStatus) {
+                    sfcDeliveryStatuses.value[remoteOrd.id] = { delivery_status: remoteOrd.sfcDeliveryStatus, success: true };
                   }
                   newOrdersList.push(remoteOrd);
                   updatedCount++;
@@ -1948,10 +1966,14 @@
               syncNotice.value = `⚡ Synced ${updatedCount} team updates from Google Sheets`;
               setTimeout(() => { syncNotice.value = ''; }, 4000);
             }
-            setTimeout(() => { 
-              fetchSfcStatusForOrders(orders.value); 
-              fetchFraudCheckForOrders(orders.value);
-            }, 200);
+            const now = Date.now();
+            if (now - lastSfcBulkCheckTime > 5 * 60 * 1000) {
+              lastSfcBulkCheckTime = now;
+              setTimeout(() => { 
+                fetchSfcStatusForOrders(orders.value, false); 
+                fetchFraudCheckForOrders(orders.value);
+              }, 1000);
+            }
           } catch (err) {
             console.warn('Pull sync note (offline/local fallback):', err.message);
             syncStatus.value = 'offline';
@@ -5240,6 +5262,10 @@ const executeBulkFactoryDispatch = async () => {
           }
         };
 
+        const isSyncingSfc = ref(false);
+        const sfcSyncMessage = ref('');
+        let lastSfcBulkCheckTime = 0;
+
         const fetchSfcStatus = async (order, force = false) => {
           if (!order || !order.cnNumber) return null;
           const cn = String(order.cnNumber).trim();
@@ -5254,22 +5280,29 @@ const executeBulkFactoryDispatch = async () => {
             if (res.ok) {
               const data = await res.json();
               sfcDeliveryStatuses.value[order.id] = data;
+
+              let orderChanged = false;
               if (data && data.delivery_status && data.delivery_status !== 'not_found') {
-                order.sfcDeliveryStatus = data.delivery_status;
+                if (order.sfcDeliveryStatus !== data.delivery_status) {
+                  order.sfcDeliveryStatus = data.delivery_status;
+                  orderChanged = true;
+                }
               }
-              // Manual delivery charge (no auto steadfast sync)
-              let chargeChanged = false;
+
               if (data && data.cod_fee !== undefined && data.cod_fee !== null) {
                 const newCod = Number(data.cod_fee);
                 if (order.codCharge !== newCod) {
                   order.codCharge = newCod;
-                  chargeChanged = true;
+                  orderChanged = true;
                 }
               }
               
-              if (chargeChanged) {
+              if (orderChanged) {
                 order.updatedAt = getBstIsoString();
+                order.updatedBy = currentUser.value?.username || 'admin';
+                queueChange('orders', order);
                 saveOrdersLocally();
+                triggerAutoSync(true);
               }
             }
           } catch (err) {
@@ -5283,8 +5316,17 @@ const executeBulkFactoryDispatch = async () => {
           await fetchSfcStatus(order, true);
         };
 
-        const fetchSfcStatusForOrders = async (ordersList) => {
-          const listWithCn = (ordersList || []).filter(o => o && o.cnNumber && String(o.cnNumber).trim());
+        const fetchSfcStatusForOrders = async (ordersList, force = false) => {
+          // If not force, filter only orders with cnNumber that are not already in terminal status (delivered/cancelled)
+          const listWithCn = (ordersList || []).filter(o => {
+            if (!o || !o.cnNumber || !String(o.cnNumber).trim()) return false;
+            if (!force) {
+              const sfc = (o.sfcDeliveryStatus || '').toLowerCase().trim();
+              if (sfc === 'delivered' || sfc === 'cancelled') return false;
+            }
+            return true;
+          });
+
           if (listWithCn.length === 0) return;
 
           const itemsToQuery = listWithCn.map(o => ({
@@ -5304,29 +5346,60 @@ const executeBulkFactoryDispatch = async () => {
                 let anyUpdated = false;
                 Object.keys(data.results).forEach(orderId => {
                   const resObj = data.results[orderId];
+                  if (!resObj) return;
                   sfcDeliveryStatuses.value[orderId] = resObj;
                   const ord = orders.value.find(o => o.id === orderId);
                   if (ord) {
-                    if (resObj && resObj.delivery_status && resObj.delivery_status !== 'not_found') {
-                      ord.sfcDeliveryStatus = resObj.delivery_status;
+                    let orderChanged = false;
+                    if (resObj.delivery_status && resObj.delivery_status !== 'not_found') {
+                      if (ord.sfcDeliveryStatus !== resObj.delivery_status) {
+                        ord.sfcDeliveryStatus = resObj.delivery_status;
+                        orderChanged = true;
+                      }
                     }
 
-                    if (resObj && resObj.cod_fee !== undefined && resObj.cod_fee !== null) {
+                    if (resObj.cod_fee !== undefined && resObj.cod_fee !== null) {
                       const newCod = Number(resObj.cod_fee);
                       if (ord.codCharge !== newCod) {
                         ord.codCharge = newCod;
-                        anyUpdated = true;
+                        orderChanged = true;
                       }
+                    }
+
+                    if (orderChanged) {
+                      ord.updatedAt = getBstIsoString();
+                      ord.updatedBy = currentUser.value?.username || 'system:sfc';
+                      queueChange('orders', ord);
+                      anyUpdated = true;
                     }
                   }
                 });
+
                 if (anyUpdated) {
                   saveOrdersLocally();
+                  triggerAutoSync(true);
                 }
               }
             }
           } catch (err) {
             console.warn('[SFC Bulk Status Error]', err);
+          }
+        };
+
+        const syncAllSteadfastStatuses = async (userInitiated = false) => {
+          if (isSyncingSfc.value) return;
+          isSyncingSfc.value = true;
+          sfcSyncMessage.value = '🔄 Querying Steadfast Courier statuses...';
+          try {
+            await fetchSfcStatusForOrders(orders.value, true);
+            sfcSyncMessage.value = '✅ Steadfast statuses updated and synced across all admins!';
+            setTimeout(() => { sfcSyncMessage.value = ''; }, 3500);
+          } catch (e) {
+            sfcSyncMessage.value = '⚠️ Steadfast status check completed';
+            setTimeout(() => { sfcSyncMessage.value = ''; }, 3000);
+          } finally {
+            isSyncingSfc.value = false;
+            lastSfcBulkCheckTime = Date.now();
           }
         };
 
@@ -6929,6 +7002,9 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           fetchSfcStatus,
           refreshSingleSfcStatus,
           fetchSfcStatusForOrders,
+          isSyncingSfc,
+          sfcSyncMessage,
+          syncAllSteadfastStatuses,
           fraudCheckMap,
           fraudLoadingMap,
           normalizeCustomerPhone,

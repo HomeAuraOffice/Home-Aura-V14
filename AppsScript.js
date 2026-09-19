@@ -298,11 +298,22 @@ function mergeObjectsByIdLWW(sheetName, incomingObjects) {
         if ((incObj.factoryTag === undefined || incObj.factoryTag === '' || incObj.factoryTag === null) && existing.factoryTag) {
           incObj.factoryTag = existing.factoryTag;
         }
+        if ((incObj.sfcDeliveryStatus === undefined || incObj.sfcDeliveryStatus === '' || incObj.sfcDeliveryStatus === null) && existing.sfcDeliveryStatus) {
+          incObj.sfcDeliveryStatus = existing.sfcDeliveryStatus;
+        }
         map[key] = Object.assign({}, existing, incObj);
         updatedCount++;
       } else {
+        var modified = false;
         if (incObj.factoryTag && !existing.factoryTag) {
           existing.factoryTag = incObj.factoryTag;
+          modified = true;
+        }
+        if (incObj.sfcDeliveryStatus && !existing.sfcDeliveryStatus) {
+          existing.sfcDeliveryStatus = incObj.sfcDeliveryStatus;
+          modified = true;
+        }
+        if (modified) {
           map[key] = existing;
           updatedCount++;
         }
@@ -406,6 +417,10 @@ function objectsToSheetAtomic(sheetName, objects) {
 
   // Collect all unique headers across all objects
   var headersMap = {};
+  if (sheetName === 'orders' || sheetName === 'deletedOrders') {
+    headersMap['sfcDeliveryStatus'] = true;
+    headersMap['factoryTag'] = true;
+  }
   objects.forEach(function(obj) {
     if (typeof obj === 'object' && obj !== null) {
       Object.keys(obj).forEach(function(key) {
