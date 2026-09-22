@@ -68,6 +68,18 @@
           'Factory Submit'
         ];
 
+        const allOrderStatuses = [
+          'Confirmation Call',
+          'Courier Booking',
+          'Factory Submit',
+          'Courier Pending',
+          'Delivered',
+          'Partial Delivered',
+          'Cancelled',
+          'Returned from Customer',
+          'Returned Received'
+        ];
+
         // --- SEEDING DEFAULT USERS ---
         const defaultUsers = [];
 
@@ -143,20 +155,39 @@
         const parseToDate = (input) => {
           if (!input) return null;
           if (input instanceof Date) return isNaN(input.getTime()) ? null : input;
+          if (typeof input === 'number') {
+            const d = new Date(input > 1e11 ? input : input * 1000);
+            return isNaN(d.getTime()) ? null : d;
+          }
           let str = String(input).trim();
           if (!str) return null;
-          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
-            return new Date(str + 'T00:00:00Z');
+          if (/^\d{10,13}$/.test(str)) {
+            const num = Number(str);
+            const d = new Date(num > 1e11 ? num : num * 1000);
+            if (!isNaN(d.getTime())) return d;
           }
-          if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(str)) {
-            str = str.replace(' ', 'T');
-          }
+          // Direct parse test
           let d = new Date(str);
           if (!isNaN(d.getTime())) return d;
-          const parts = str.split(/[-/]/);
-          if (parts.length === 3 && parts[2].length === 4) {
-            d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-            if (!isNaN(d.getTime())) return d;
+
+          // Parse DD/MM/YYYY or DD-MM-YYYY with optional time
+          const dateOnlyPart = str.split(/[T\s,]+/)[0];
+          const timePart = str.includes(':') ? str.split(/[T\s,]+/).slice(1).join(' ').trim() : '';
+          
+          if (dateOnlyPart) {
+            const parts = dateOnlyPart.split(/[-/.]/);
+            if (parts.length === 3) {
+              if (parts[0].length === 4) {
+                const iso = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}` + (timePart ? ' ' + timePart : '');
+                d = new Date(iso);
+                if (!isNaN(d.getTime())) return d;
+              }
+              if (parts[2].length === 4) {
+                const iso = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}` + (timePart ? ' ' + timePart : '');
+                d = new Date(iso);
+                if (!isNaN(d.getTime())) return d;
+              }
+            }
           }
           return null;
         };
@@ -184,10 +215,9 @@
             return itemBst === nowBst;
           }
           if (range === 'week') {
-            const nowDate = new Date(nowBst + 'T00:00:00Z');
-            const minDate = new Date(nowDate.getTime() - 6 * 24 * 60 * 60 * 1000);
-            const itemDate = new Date(itemBst + 'T00:00:00Z');
-            return itemDate >= minDate && itemDate <= nowDate;
+            const minDate = new Date(new Date(nowBst + 'T00:00:00Z').getTime() - 7 * 24 * 60 * 60 * 1000);
+            const itemDate = new Date(itemBst + 'T12:00:00Z');
+            return itemDate >= minDate;
           }
           if (range === 'month') {
             return itemBst.substring(0, 7) === nowBst.substring(0, 7);
@@ -198,8 +228,8 @@
         const formatBangladeshDisplayTime = (isoOrDate) => {
           if (!isoOrDate) return 'N/A';
           try {
-            const d = new Date(isoOrDate);
-            if (isNaN(d.getTime())) return String(isoOrDate);
+            const d = parseToDate(isoOrDate) || new Date(isoOrDate);
+            if (!d || isNaN(d.getTime())) return String(isoOrDate);
             return d.toLocaleString('en-GB', {
               timeZone: 'Asia/Dhaka',
               day: '2-digit',
@@ -1931,16 +1961,22 @@
               localStorage.setItem('homeaura_tasks', JSON.stringify(tasks.value));
             }
 
-            // 8. Settings Merge (WhatsApp Reporting Group, etc.)
+            // 8. Settings Merge (WhatsApp Reporting Group, Brand Favicon, etc.)
             if (data.settings) {
               let waRemoteVal = null;
+              let faviconRemoteVal = null;
               if (Array.isArray(data.settings)) {
                 const waSetting = data.settings.find(s => s && (s.id === 'adminWaGroupLink' || s.key === 'adminWaGroupLink' || s.name === 'adminWaGroupLink'));
                 if (waSetting) {
                   waRemoteVal = waSetting.value !== undefined ? waSetting.value : (waSetting.val || waSetting.link || '');
                 }
+                const favSetting = data.settings.find(s => s && (s.id === 'app_favicon' || s.key === 'app_favicon' || s.name === 'app_favicon' || s.id === 'favicon'));
+                if (favSetting) {
+                  faviconRemoteVal = favSetting.value !== undefined ? favSetting.value : (favSetting.val || '');
+                }
               } else if (typeof data.settings === 'object') {
                 waRemoteVal = data.settings.adminWaGroupLink;
+                faviconRemoteVal = data.settings.app_favicon || data.settings.favicon;
               }
 
               if (waRemoteVal && typeof waRemoteVal === 'string' && waRemoteVal.trim().startsWith('http')) {
@@ -1954,6 +1990,15 @@
                     adminWaGroupLink.value = waRemoteVal.trim();
                     localStorage.setItem('homeaura_admin_wa', waRemoteVal.trim());
                   }
+                }
+              }
+
+              if (faviconRemoteVal && typeof faviconRemoteVal === 'string' && faviconRemoteVal.trim()) {
+                const hasFavPending = syncQueue.value.changes.settings && (syncQueue.value.changes.settings.app_favicon || syncQueue.value.changes.settings.favicon);
+                if (!hasFavPending) {
+                  customFavicon.value = faviconRemoteVal.trim();
+                  localStorage.setItem('homeaura_favicon', customFavicon.value);
+                  applyFavicon(customFavicon.value);
                 }
               }
             }
@@ -2139,6 +2184,12 @@
             localStorage.setItem('homeaura_admin_wa', DEFAULT_WA_GROUP_LINK);
           }
 
+          const storedFavicon = localStorage.getItem('homeaura_favicon');
+          if (storedFavicon && storedFavicon.trim()) {
+            customFavicon.value = storedFavicon.trim();
+            applyFavicon(customFavicon.value);
+          }
+
           const storedSession = localStorage.getItem('homeaura_session');
           if (storedSession) {
             try {
@@ -2207,6 +2258,27 @@
         
         const selectedCollageTile = ref('terminal');
         const selectCollageTile = (tileKey) => { selectedCollageTile.value = tileKey; selectedProofTile.value = null; };
+
+        // --- BRAND FAVICON MANAGEMENT ---
+        const customFavicon = ref(localStorage.getItem('homeaura_favicon') || '');
+        const faviconInputUrl = ref('');
+        const isFaviconSaving = ref(false);
+
+        const applyFavicon = (url) => {
+          if (!url) return;
+          try {
+            let link = document.getElementById('app-favicon');
+            if (!link) {
+              link = document.createElement('link');
+              link.id = 'app-favicon';
+              link.rel = 'icon';
+              document.head.appendChild(link);
+            }
+            link.href = url;
+          } catch(e) {
+            console.warn('[Favicon Apply Error]', e);
+          }
+        };
 
         const loginForm = reactive({ username: '', password: '' });
         const loginError = ref('');
@@ -2908,14 +2980,48 @@
           }, 4000);
         };
 
+        // --- STATUS & DELIVERY HELPERS ---
+        const isOrderDelivered = (o) => {
+          if (!o) return false;
+          if (o.status === 'Cancelled' || o.status === 'Void') return false;
+          const st = String(o.status || '').trim().toLowerCase();
+          if (st === 'delivered' || st === 'partial delivered') return true;
+          if (o.manualDeliveredOverride === false) return false;
+          const sfcLive = (sfcDeliveryStatuses.value && o.id) ? sfcDeliveryStatuses.value[o.id]?.delivery_status : null;
+          const sfc = String(sfcLive || o.sfcDeliveryStatus || '').trim().toLowerCase();
+          return sfc === 'delivered' || sfc === 'partial_delivered';
+        };
+
+        const isOrderCancelled = (o) => {
+          if (!o) return false;
+          const st = String(o.status || '').trim().toLowerCase();
+          if (st === 'cancelled' || st === 'void') return true;
+          if (o.manualCancelledOverride === false) return false;
+          const sfcLive = (sfcDeliveryStatuses.value && o.id) ? sfcDeliveryStatuses.value[o.id]?.delivery_status : null;
+          const sfc = String(sfcLive || o.sfcDeliveryStatus || '').trim().toLowerCase();
+          return sfc === 'cancelled';
+        };
+
+        const isOrderPendingInFactory = (o, factoryName) => {
+          if (!o || o.factoryTag !== factoryName) return false;
+          const st = String(o.status || '').trim();
+          // Terminal or post-factory statuses
+          if (['Delivered', 'Partial Delivered', 'Cancelled', 'Void', 'Returned Received', 'Returned from Customer', 'Courier Pending', 'Dispatched'].includes(st)) {
+            return false;
+          }
+          // If SFC status indicates courier has accepted/picked up (pending, in_transit, delivered, etc.),
+          // it has already left the factory, so it is NOT pending in the factory.
+          const sfc = String(o.sfcDeliveryStatus || '').trim().toLowerCase();
+          if (sfc && sfc !== 'not_found' && sfc !== '') {
+            return false;
+          }
+          return true;
+        };
+
         // --- DYNAMIC FACTORY PRIORITY ENGINE ---
         const rankedFactories = computed(() => {
           return factories.value.map(f => {
-            const pendingCount = orders.value.filter(o => {
-              const isThisFactory = o.factoryTag === f.name;
-              const isPending = o.status !== 'Delivered' && o.status !== 'Returned Received';
-              return isThisFactory && isPending;
-            }).length;
+            const pendingCount = orders.value.filter(o => isOrderPendingInFactory(o, f.name)).length;
 
             let stockScore = 30;
             if (f.stockStatus === 'Low Stock') stockScore = 15;
@@ -2935,10 +3041,27 @@
           }).sort((a, b) => b.totalScore - a.totalScore);
         });
 
-        // --- CURRENCY FORMATTING ---
+        // --- NUMBER & CURRENCY FORMATTING ---
+        const cleanNumber = (val) => {
+          if (val === undefined || val === null || val === '') return 0;
+          if (typeof val === 'number') return isNaN(val) ? 0 : val;
+          const cleaned = String(val).replace(/[^0-9.-]+/g, '');
+          const parsed = parseFloat(cleaned);
+          return isNaN(parsed) ? 0 : parsed;
+        };
+
         const formatBDT = (amount) => {
-          const val = Number(amount) || 0;
-          return '৳' + val.toLocaleString('en-BD');
+          const val = cleanNumber(amount);
+          return '৳' + Math.round(val).toLocaleString('en-BD');
+        };
+
+        const getOrderTotalAmount = (o) => {
+          if (!o) return 0;
+          const tot = cleanNumber(o.totalAmount);
+          if (tot > 0) return tot;
+          const sale = cleanNumber(o.saleAmount);
+          const deliv = cleanNumber(o.deliveryCharge);
+          return sale + deliv;
         };
 
         // --- AUTHENTICATION ---
@@ -2998,24 +3121,49 @@
 
         const filterOrdersForDashboard = (orderList) => {
           return (orderList || []).filter(o => {
+            if (!o) return false;
             // Apply seller filter
             if (dashboardFilter.sellerId !== 'all') {
-              const matchSeller = (o.merchantId === dashboardFilter.sellerId) || 
-                                  (o.merchantName === dashboardFilter.sellerId) ||
-                                  (users.value && users.value.some(u => u.id === dashboardFilter.sellerId && (u.name === o.merchantName || u.username === o.merchantName)));
+              const selId = String(dashboardFilter.sellerId).trim();
+              const selUser = (users.value || []).find(u => String(u.id).trim() === selId);
+              const mId = String(o.merchantId || '').trim();
+              const mName = String(o.merchantName || '').trim().toLowerCase();
+              
+              const matchSeller = (mId && mId === selId) || 
+                                  (mName && mName === selId.toLowerCase()) ||
+                                  (selUser && (
+                                    (mId && mId === String(selUser.id).trim()) ||
+                                    (mName && mName === String(selUser.name || '').trim().toLowerCase()) ||
+                                    (selUser.username && mName === String(selUser.username).trim().toLowerCase())
+                                  ));
               if (!matchSeller) return false;
             } else {
               // Exclude isolated users when viewing 'all'
               if (users.value) {
-                const seller = users.value.find(u => u.id === o.merchantId || u.name === o.merchantName);
+                const seller = users.value.find(u => 
+                  (o.merchantId && String(u.id).trim() === String(o.merchantId).trim()) ||
+                  (o.merchantName && String(u.name || '').trim().toLowerCase() === String(o.merchantName).trim().toLowerCase()) ||
+                  (u.username && o.merchantName && String(u.username).trim().toLowerCase() === String(o.merchantName).trim().toLowerCase())
+                );
                 if (seller && seller.excludeFromGlobalAnalytics) return false;
               }
             }
             
-            // Apply date filter
+            // Apply date filter (delivered date for delivered orders, else creation/order date)
             if (dashboardFilter.dateRange !== 'all') {
-              const rawDate = o.timestamp || o.createdAt || o.date || o.orderDate || o.updatedAt;
-              if (!isDateInDashboardRange(rawDate, dashboardFilter.dateRange)) {
+              const isDelivered = isOrderDelivered(o);
+              let primaryDate = null;
+              if (isDelivered && o.deliveredAt) {
+                primaryDate = o.deliveredAt;
+              }
+              if (!primaryDate) {
+                primaryDate = o.timestamp || o.createdAt || o.orderDate || o.date;
+              }
+              if (primaryDate) {
+                if (!isDateInDashboardRange(primaryDate, dashboardFilter.dateRange)) return false;
+              } else if (o.updatedAt) {
+                if (!isDateInDashboardRange(o.updatedAt, dashboardFilter.dateRange)) return false;
+              } else {
                 return false;
               }
             }
@@ -3027,26 +3175,33 @@
           const filteredOrders = filterOrdersForDashboard(orders.value);
           
           const calculateNetForOrder = (o) => {
-            const total = Number(o.totalAmount) || 0;
-            const deliveryExp = Number(o.deliveryCharge) || 0;
+            const total = getOrderTotalAmount(o);
+            const deliveryExp = cleanNumber(o.deliveryCharge);
             let codExp = 0;
-            if (o.codCharge !== undefined && o.codCharge !== null && o.codCharge !== '' && !isNaN(o.codCharge) && Number(o.codCharge) > 0) {
-              codExp = Number(o.codCharge);
+            if (o.codCharge !== undefined && o.codCharge !== null && o.codCharge !== '' && !isNaN(cleanNumber(o.codCharge)) && cleanNumber(o.codCharge) > 0) {
+              codExp = cleanNumber(o.codCharge);
             } else {
               codExp = Math.round(total * 0.01);
             }
-            return total - (deliveryExp + codExp);
+            return Math.max(0, total - (deliveryExp + codExp));
           };
 
-          const grossRevenue = filteredOrders.reduce((acc, o) => acc + calculateNetForOrder(o), 0);
-          const deliveredProductsRevenue = filteredOrders
-            .filter(o => o.status === 'Delivered' || o.status === 'Partial Delivered')
-            .reduce((acc, o) => acc + calculateNetForOrder(o), 0);
-          const totalOrders = filteredOrders.length;
-          const deliveredCount = filteredOrders.filter(o => o.status === 'Delivered').length;
-          const pendingCount = filteredOrders.filter(o => o.status !== 'Delivered' && o.status !== 'Returned Received' && o.status !== 'Void').length;
-          const urgentCount = filteredOrders.filter(o => o.urgent).length;
-          return { grossRevenue, deliveredProductsRevenue, totalOrders, deliveredCount, pendingCount, urgentCount };
+          // Cancelled and Void orders MUST NOT be included in Gross Revenue
+          const validOrders = filteredOrders.filter(o => !isOrderCancelled(o) && o.status !== 'Returned Received');
+          const grossRevenue = validOrders.reduce((acc, o) => acc + calculateNetForOrder(o), 0);
+          
+          // Delivered orders: checks both internal status and SFC delivery status
+          const deliveredOrders = filteredOrders.filter(o => isOrderDelivered(o) && !isOrderCancelled(o));
+          const deliveredProductsRevenue = deliveredOrders.reduce((acc, o) => acc + calculateNetForOrder(o), 0);
+            
+          const totalOrders = validOrders.length;
+          const totalAllOrders = filteredOrders.length;
+          const cancelledCount = filteredOrders.filter(o => isOrderCancelled(o)).length;
+          const deliveredCount = deliveredOrders.length;
+          const pendingCount = filteredOrders.filter(o => !isOrderDelivered(o) && !isOrderCancelled(o) && o.status !== 'Returned Received').length;
+          const urgentCount = filteredOrders.filter(o => o.urgent && !isOrderCancelled(o)).length;
+          
+          return { grossRevenue, deliveredProductsRevenue, totalOrders, totalAllOrders, cancelledCount, deliveredCount, pendingCount, urgentCount };
         });
 
         const sellersList = computed(() => users.value.filter(u => u && (u.role === 'seller' || u.role === 'moderator')));
@@ -3054,16 +3209,16 @@
         const globalSalesProgress = computed(() => {
           let allSellers = users.value.filter(u => u && (u.role === 'seller' || u.role === 'moderator'));
           if (dashboardFilter.sellerId !== 'all') {
-            allSellers = allSellers.filter(u => u.id === dashboardFilter.sellerId);
+            allSellers = allSellers.filter(u => String(u.id).trim() === String(dashboardFilter.sellerId).trim());
           } else {
             allSellers = allSellers.filter(u => !u.excludeFromGlobalAnalytics);
           }
-          const target = allSellers.reduce((sum, u) => sum + (Number(u.target) || 0), 0);
+          const target = allSellers.reduce((sum, u) => sum + (cleanNumber(u.target) || 0), 0);
           
           const filteredOrders = filterOrdersForDashboard(orders.value);
-          const validOrders = filteredOrders.filter(o => o.status !== 'Void' && o.status !== 'Returned Received');
+          const validOrders = filteredOrders.filter(o => !isOrderCancelled(o) && o.status !== 'Returned Received');
           
-          const sales = validOrders.reduce((sum, o) => sum + (Number(o.saleAmount) || Number(o.totalAmount) || 0), 0);
+          const sales = validOrders.reduce((sum, o) => sum + (cleanNumber(o.saleAmount) || getOrderTotalAmount(o)), 0);
           const percentage = target > 0 ? Math.min(100, Math.round((sales / target) * 100)) : 0;
           return { target, sales, percentage };
         });
@@ -3103,19 +3258,19 @@
           let totalCodCharge = 0;
           
           const filteredOrders = filterOrdersForDashboard(orders.value);
-          const relevantOrders = filteredOrders.filter(o => o.status !== 'Void' && o.status !== 'Returned Received');
+          const relevantOrders = filteredOrders.filter(o => !isOrderCancelled(o) && o.status !== 'Returned Received');
           
           relevantOrders.forEach(o => {
-            const saleAmt = Number(o.saleAmount) || 0;
-            const delivCharge = Number(o.deliveryCharge) || 0;
-            const totalAmt = Number(o.totalAmount) || 0;
+            const delivCharge = cleanNumber(o.deliveryCharge);
+            const totalAmt = getOrderTotalAmount(o);
+            const saleAmt = cleanNumber(o.saleAmount) || Math.max(0, totalAmt - delivCharge);
             
-            totalSales += saleAmt || (totalAmt - delivCharge);
+            totalSales += saleAmt;
             totalDeliveryCollected += delivCharge;
             
             let codExp = 0;
-            if (o.codCharge !== undefined && o.codCharge !== null && o.codCharge !== '' && !isNaN(o.codCharge) && Number(o.codCharge) > 0) {
-              codExp = Number(o.codCharge);
+            if (o.codCharge !== undefined && o.codCharge !== null && o.codCharge !== '' && !isNaN(cleanNumber(o.codCharge)) && cleanNumber(o.codCharge) > 0) {
+              codExp = cleanNumber(o.codCharge);
             } else {
               codExp = Math.round(totalAmt * 0.01);
             }
@@ -3139,21 +3294,35 @@
               visibleSellersList = sellersList.value.filter(s => currentUser.value.visibleSellers.includes(s.id));
           }
           if (dashboardFilter.sellerId !== 'all') {
-             visibleSellersList = visibleSellersList.filter(s => s.id === dashboardFilter.sellerId);
+             visibleSellersList = visibleSellersList.filter(s => String(s.id).trim() === String(dashboardFilter.sellerId).trim());
           } else {
              visibleSellersList = visibleSellersList.filter(s => !s.excludeFromGlobalAnalytics);
           }
           const filteredOrders = filterOrdersForDashboard(orders.value);
           return visibleSellersList.map(seller => {
-            const sellerOrders = filteredOrders.filter(o => o.merchantName === seller.name || o.merchantId === seller.id || o.merchantName === seller?.username);
-            const validOrders = sellerOrders.filter(o => o.status !== 'Void' && o.status !== 'Returned Received');
-            const totalSales = validOrders.reduce((acc, o) => acc + (Number(o.saleAmount) || Number(o.totalAmount) || 0), 0);
-            const target = Number(seller.target) || 300000;
+            const sellerOrders = filteredOrders.filter(o => {
+              const mId = String(o.merchantId || '').trim();
+              const mName = String(o.merchantName || '').trim().toLowerCase();
+              return (mId && mId === String(seller.id).trim()) ||
+                     (mName && mName === String(seller.name || '').trim().toLowerCase()) ||
+                     (seller.username && mName === String(seller.username).trim().toLowerCase());
+            });
+            const validOrders = sellerOrders.filter(o => !isOrderCancelled(o) && o.status !== 'Returned Received');
+            const totalSales = validOrders.reduce((acc, o) => acc + (cleanNumber(o.saleAmount) || getOrderTotalAmount(o)), 0);
+            const target = cleanNumber(seller.target) || 300000;
             const percentage = target > 0 ? Math.round((totalSales / target) * 100) : 0;
+            
+            const totalDelivered = sellerOrders.filter(o => isOrderDelivered(o) && !isOrderCancelled(o)).length;
+            const totalCancelled = sellerOrders.filter(o => isOrderCancelled(o)).length;
+            const totalPending = sellerOrders.filter(o => !isOrderDelivered(o) && !isOrderCancelled(o) && o.status !== 'Returned Received').length;
+            
             return {
               username: seller?.username,
               name: seller.name,
-              totalOrders: sellerOrders.length,
+              totalOrders: sellerOrders.filter(o => !isOrderCancelled(o)).length,
+              totalDelivered,
+              totalCancelled,
+              totalPending,
               totalSales,
               target,
               percentage
@@ -3165,7 +3334,7 @@
           const stats = {};
           let bills = factoryBills.value || [];
           if (dashboardFilter.sellerId !== 'all') {
-            bills = bills.filter(b => b.sellerId === dashboardFilter.sellerId);
+            bills = bills.filter(b => String(b.sellerId).trim() === String(dashboardFilter.sellerId).trim());
           }
           if (dashboardFilter.dateRange !== 'all') {
             bills = bills.filter(b => {
@@ -3177,7 +3346,7 @@
             if (!stats[bill.factoryId]) {
               stats[bill.factoryId] = { factoryId: bill.factoryId, factoryName: getFactoryName(bill.factoryId), totalAmount: 0, billCount: 0, orderCount: 0 };
             }
-            stats[bill.factoryId].totalAmount += Number(bill.amount) || 0;
+            stats[bill.factoryId].totalAmount += cleanNumber(bill.amount);
             stats[bill.factoryId].billCount += 1;
             stats[bill.factoryId].orderCount += (bill.linkedOrderIds || []).length;
           });
@@ -3187,11 +3356,11 @@
         const totalFactoryBillsAmount = computed(() => {
           let bills = factoryBills.value || [];
           if (dashboardFilter.sellerId !== 'all') {
-            bills = bills.filter(b => b.sellerId === dashboardFilter.sellerId);
+            bills = bills.filter(b => String(b.sellerId).trim() === String(dashboardFilter.sellerId).trim());
           } else {
             bills = bills.filter(b => {
               if (b.sellerId) {
-                const seller = users.value.find(u => u.id === b.sellerId);
+                const seller = users.value.find(u => String(u.id).trim() === String(b.sellerId).trim());
                 if (seller && seller.excludeFromGlobalAnalytics) return false;
               }
               return true;
@@ -3203,17 +3372,17 @@
               return isDateInDashboardRange(bDate, dashboardFilter.dateRange);
             });
           }
-          return bills.reduce((sum, b) => sum + (Number(b.amount) || 0), 0);
+          return bills.reduce((sum, b) => sum + cleanNumber(b.amount), 0);
         });
 
         const totalOperationalExpenses = computed(() => {
           let exps = expenses.value || [];
           if (dashboardFilter.sellerId !== 'all') {
-            exps = exps.filter(e => e.sellerId === dashboardFilter.sellerId);
+            exps = exps.filter(e => String(e.sellerId).trim() === String(dashboardFilter.sellerId).trim());
           } else {
             exps = exps.filter(e => {
               if (e.sellerId) {
-                const seller = users.value.find(u => u.id === e.sellerId);
+                const seller = users.value.find(u => String(u.id).trim() === String(e.sellerId).trim());
                 if (seller && seller.excludeFromGlobalAnalytics) return false;
               }
               return true;
@@ -3225,14 +3394,14 @@
               return isDateInDashboardRange(eDate, dashboardFilter.dateRange);
             });
           }
-          return exps.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+          return exps.reduce((sum, e) => sum + cleanNumber(e.amount), 0);
         });
 
         const sellerBillStats = computed(() => {
           const stats = {};
           let bills = factoryBills.value || [];
           if (dashboardFilter.sellerId !== 'all') {
-            bills = bills.filter(b => b.sellerId === dashboardFilter.sellerId);
+            bills = bills.filter(b => String(b.sellerId).trim() === String(dashboardFilter.sellerId).trim());
           }
           if (dashboardFilter.dateRange !== 'all') {
             bills = bills.filter(b => {
@@ -3243,16 +3412,17 @@
           bills.forEach(bill => {
             const linked = bill.linkedOrderIds || [];
             if (linked.length === 0) return;
-            const costPerOrder = (Number(bill.amount) || 0) / linked.length;
+            const costPerOrder = cleanNumber(bill.amount) / linked.length;
             linked.forEach(oid => {
-              const ord = orders.value.find(o => o.id === oid);
+              const ord = orders.value.find(o => String(o.id).trim() === String(oid).trim());
               if (ord) {
-                if (dashboardFilter.sellerId !== 'all' && ord.merchantId !== dashboardFilter.sellerId) return;
-                if (!stats[ord.merchantId]) {
-                  stats[ord.merchantId] = { merchantId: ord.merchantId, merchantName: ord.merchantName, totalCost: 0, linkedOrdersCount: 0 };
+                if (dashboardFilter.sellerId !== 'all' && String(ord.merchantId).trim() !== String(dashboardFilter.sellerId).trim()) return;
+                const mKey = ord.merchantId || ord.merchantName || 'unassigned';
+                if (!stats[mKey]) {
+                  stats[mKey] = { merchantId: ord.merchantId, merchantName: ord.merchantName || 'Unassigned', totalCost: 0, linkedOrdersCount: 0 };
                 }
-                stats[ord.merchantId].totalCost += costPerOrder;
-                stats[ord.merchantId].linkedOrdersCount += 1;
+                stats[mKey].totalCost += costPerOrder;
+                stats[mKey].linkedOrdersCount += 1;
               }
             });
           });
@@ -3262,9 +3432,9 @@
         const dashboardMarketingSpend = computed(() => {
           let spends = marketingSpends.value || [];
           if (dashboardFilter.dateRange !== 'all') {
-            spends = spends.filter(s => isDateInDashboardRange(s.date, dashboardFilter.dateRange));
+            spends = spends.filter(s => isDateInDashboardRange(s.date || s.createdAt, dashboardFilter.dateRange));
           }
-          return spends.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+          return spends.reduce((sum, s) => sum + cleanNumber(s.amount), 0);
         });
 
         const myOrders = computed(() => {
@@ -3281,7 +3451,15 @@
 
         const filteredOrders = computed(() => {
           let result = orders.value.filter(o => {
-            if (statusFilter.value !== 'ALL' && o.status !== statusFilter.value) return false;
+            if (statusFilter.value !== 'ALL') {
+              if (statusFilter.value === 'Delivered') {
+                if (!isOrderDelivered(o)) return false;
+              } else if (statusFilter.value === 'Cancelled') {
+                if (o.status !== 'Cancelled' && o.sfcDeliveryStatus !== 'cancelled') return false;
+              } else if (o.status !== statusFilter.value) {
+                return false;
+              }
+            }
             if (merchantFilter.value !== 'ALL' && o.merchantName !== merchantFilter.value) return false;
             if (factoryFilter.value !== 'ALL' && (o.factoryTag || '') !== factoryFilter.value) return false;
             if (urgentOnly.value && !o.urgent) return false;
@@ -4541,19 +4719,46 @@
 
         const quickStatusChange = (order, newStatus) => {
           if (currentUser.value?.role === 'seller' && order.merchantName !== currentUser.value?.name && order.merchantId !== currentUser.value?.id) {
-            alert("⚠️ Security restriction: You cannot update status of orders assigned to other merchants.");
+            syncNotice.value = "⚠️ Security restriction: You cannot update status of orders assigned to other merchants.";
+            setTimeout(() => { syncNotice.value = ''; }, 4000);
             return;
           }
-          order.status = newStatus;
-          order.updatedAt = getBstIsoString();
-          order.updatedBy = currentUser.value?.username || 'seller';
-          queueChange('orders', order);
+          const target = orders.value.find(o => o.id === order.id) || order;
+          const oldStatus = target.status;
+          target.previousStatus = oldStatus;
+          target.status = newStatus;
+          
+          if (newStatus === 'Cancelled') {
+            target.cancelledAt = getBstIsoString();
+            target.sfcDeliveryStatus = 'cancelled';
+            target.manualCancelledOverride = true;
+          } else if (oldStatus === 'Cancelled') {
+            target.cancelledAt = '';
+            target.manualCancelledOverride = false;
+            if (target.sfcDeliveryStatus === 'cancelled') target.sfcDeliveryStatus = 'pending';
+          }
+          
+          if (newStatus === 'Delivered' || newStatus === 'Partial Delivered') {
+            target.deliveredAt = target.deliveredAt || getBstIsoString();
+            target.sfcDeliveryStatus = 'delivered';
+            target.manualDeliveredOverride = true;
+          } else if (oldStatus === 'Delivered' || oldStatus === 'Partial Delivered') {
+            target.deliveredAt = '';
+            target.manualDeliveredOverride = false;
+            if (target.sfcDeliveryStatus === 'delivered') target.sfcDeliveryStatus = 'pending';
+          }
+
+          target.updatedAt = getBstIsoString();
+          target.updatedBy = currentUser.value?.username || 'seller';
+          queueChange('orders', target);
           saveOrdersLocally();
+          triggerAutoSync(true);
         };
 
         const toggleUrgent = (order) => {
           if (currentUser.value?.role === 'seller' && order.merchantName !== currentUser.value?.name && order.merchantId !== currentUser.value?.id) {
-            alert("⚠️ Security restriction: You cannot update orders assigned to other merchants.");
+            syncNotice.value = "⚠️ Security restriction: You cannot update orders assigned to other merchants.";
+            setTimeout(() => { syncNotice.value = ''; }, 4000);
             return;
           }
           order.urgent = !order.urgent;
@@ -4561,6 +4766,7 @@
           order.updatedBy = currentUser.value?.username || 'seller';
           queueChange('orders', order);
           saveOrdersLocally();
+          triggerAutoSync(true);
         };
 
         // --- FACTORY BILLS AND EXPENSES ---
@@ -5169,6 +5375,7 @@ const executeBulkFactoryDispatch = async () => {
             case 'Partial Delivered': return 'bg-teal-50 text-teal-700 border-teal-200';
             case 'Returned from Customer': return 'bg-rose-50 text-rose-700 border-rose-200';
             case 'Returned Received': return 'bg-slate-100 text-slate-700 border-slate-300';
+            case 'Cancelled': return 'bg-rose-100 text-rose-800 border-rose-300 font-bold';
             default: return 'bg-slate-50 text-slate-700 border-slate-200';
           }
         };
@@ -5287,6 +5494,21 @@ const executeBulkFactoryDispatch = async () => {
                   order.sfcDeliveryStatus = data.delivery_status;
                   orderChanged = true;
                 }
+                if (data.delivery_status === 'delivered') {
+                  if (order.status !== 'Delivered') {
+                    order.status = 'Delivered';
+                    orderChanged = true;
+                  }
+                  if (!order.deliveredAt) {
+                    order.deliveredAt = getBstIsoString();
+                    orderChanged = true;
+                  }
+                } else if (data.delivery_status === 'cancelled') {
+                  if (order.status !== 'Cancelled') {
+                    order.status = 'Cancelled';
+                    orderChanged = true;
+                  }
+                }
               }
 
               if (data && data.cod_fee !== undefined && data.cod_fee !== null) {
@@ -5355,6 +5577,21 @@ const executeBulkFactoryDispatch = async () => {
                       if (ord.sfcDeliveryStatus !== resObj.delivery_status) {
                         ord.sfcDeliveryStatus = resObj.delivery_status;
                         orderChanged = true;
+                      }
+                      if (resObj.delivery_status === 'delivered') {
+                        if (ord.status !== 'Delivered') {
+                          ord.status = 'Delivered';
+                          orderChanged = true;
+                        }
+                        if (!ord.deliveredAt) {
+                          ord.deliveredAt = getBstIsoString();
+                          orderChanged = true;
+                        }
+                      } else if (resObj.delivery_status === 'cancelled') {
+                        if (ord.status !== 'Cancelled') {
+                          ord.status = 'Cancelled';
+                          orderChanged = true;
+                        }
                       }
                     }
 
@@ -5528,6 +5765,27 @@ const executeBulkFactoryDispatch = async () => {
             modalData.order.deliveryCharge = del;
             modalData.order.saleAmount = sale;
             modalData.order.totalAmount = total;
+
+            if (modalData.order.status === 'Cancelled') {
+              modalData.order.cancelledAt = modalData.order.cancelledAt || getBstIsoString();
+              modalData.order.sfcDeliveryStatus = 'cancelled';
+              modalData.order.manualCancelledOverride = true;
+            } else if (orders.value[idx].status === 'Cancelled') {
+              modalData.order.cancelledAt = '';
+              modalData.order.manualCancelledOverride = false;
+              if (modalData.order.sfcDeliveryStatus === 'cancelled') modalData.order.sfcDeliveryStatus = 'pending';
+            }
+
+            if (modalData.order.status === 'Delivered' || modalData.order.status === 'Partial Delivered') {
+              modalData.order.deliveredAt = modalData.order.deliveredAt || getBstIsoString();
+              modalData.order.sfcDeliveryStatus = 'delivered';
+              modalData.order.manualDeliveredOverride = true;
+            } else if (orders.value[idx].status === 'Delivered' || orders.value[idx].status === 'Partial Delivered') {
+              modalData.order.deliveredAt = '';
+              modalData.order.manualDeliveredOverride = false;
+              if (modalData.order.sfcDeliveryStatus === 'delivered') modalData.order.sfcDeliveryStatus = 'pending';
+            }
+
             modalData.order.updatedAt = getBstIsoString();
             modalData.order.updatedBy = currentUser.value?.username || 'user';
             orders.value[idx] = { ...modalData.order };
@@ -5547,6 +5805,112 @@ const executeBulkFactoryDispatch = async () => {
         };
 
         // --- VOID AND TRASH ---
+        const cancelOrder = (order) => {
+          if (!order) return;
+          const target = orders.value.find(o => o.id === order.id) || order;
+          if (currentUser.value?.role === 'seller' && target.merchantName !== currentUser.value?.name && target.merchantId !== currentUser.value?.id) {
+            syncNotice.value = "⚠️ Security restriction: You cannot cancel orders assigned to other merchants.";
+            setTimeout(() => { syncNotice.value = ''; }, 4000);
+            return;
+          }
+          
+          if (target.status === 'Cancelled') {
+            // Reactivate cancelled order
+            const reactivatedStatus = (target.previousStatus && target.previousStatus !== 'Cancelled')
+              ? target.previousStatus
+              : 'Confirmation Call';
+            target.status = reactivatedStatus;
+            target.cancelledAt = '';
+            target.manualCancelledOverride = false;
+            target.sfcDeliveryStatus = (target.previousSfcStatus && target.previousSfcStatus !== 'cancelled')
+              ? target.previousSfcStatus
+              : 'pending';
+            if (sfcDeliveryStatuses.value && target.id && sfcDeliveryStatuses.value[target.id]?.delivery_status === 'cancelled') {
+              sfcDeliveryStatuses.value[target.id].delivery_status = target.sfcDeliveryStatus;
+            }
+            target.updatedAt = getBstIsoString();
+            target.updatedBy = currentUser.value?.username || 'admin';
+            queueChange('orders', target);
+            saveOrdersLocally();
+            triggerAutoSync(true);
+            syncNotice.value = `Order #${target.id} reactivated (${reactivatedStatus})! Sales amount restored to analytics.`;
+            setTimeout(() => { if (syncNotice.value?.includes(target.id)) syncNotice.value = ''; }, 4000);
+            return;
+          }
+
+          // Mark order as Cancelled
+          target.previousStatus = (target.status !== 'Cancelled') ? target.status : 'Confirmation Call';
+          target.previousSfcStatus = (target.sfcDeliveryStatus !== 'cancelled') ? target.sfcDeliveryStatus : 'pending';
+          target.status = 'Cancelled';
+          target.sfcDeliveryStatus = 'cancelled';
+          target.manualCancelledOverride = true;
+          target.cancelledAt = getBstIsoString();
+          target.updatedAt = getBstIsoString();
+          target.updatedBy = currentUser.value?.username || 'admin';
+          if (sfcDeliveryStatuses.value && target.id) {
+            if (!sfcDeliveryStatuses.value[target.id]) sfcDeliveryStatuses.value[target.id] = {};
+            sfcDeliveryStatuses.value[target.id].delivery_status = 'cancelled';
+          }
+          queueChange('orders', target);
+          saveOrdersLocally();
+          triggerAutoSync(true);
+          syncNotice.value = `🚫 Order #${target.id} cancelled. Amount removed from analytics. (Click cancel button again anytime to undo)`;
+          setTimeout(() => { if (syncNotice.value?.includes(target.id)) syncNotice.value = ''; }, 4000);
+        };
+
+        const toggleOrderDelivered = (order) => {
+          if (!order) return;
+          const target = orders.value.find(o => o.id === order.id) || order;
+          if (currentUser.value?.role === 'seller' && target.merchantName !== currentUser.value?.name && target.merchantId !== currentUser.value?.id) {
+            syncNotice.value = "⚠️ Security restriction: You cannot update delivery status for orders assigned to other merchants.";
+            setTimeout(() => { syncNotice.value = ''; }, 4000);
+            return;
+          }
+          
+          if (isOrderDelivered(target)) {
+            // Revert / Undo Delivered status
+            const revertedStatus = (target.previousStatus && target.previousStatus !== 'Delivered' && target.previousStatus !== 'Partial Delivered')
+              ? target.previousStatus
+              : 'Courier Pending';
+            target.status = revertedStatus;
+            target.sfcDeliveryStatus = (target.previousSfcStatus && target.previousSfcStatus !== 'delivered')
+              ? target.previousSfcStatus
+              : 'pending';
+            target.deliveredAt = '';
+            target.manualDeliveredOverride = false;
+            if (sfcDeliveryStatuses.value && target.id && sfcDeliveryStatuses.value[target.id]) {
+              sfcDeliveryStatuses.value[target.id].delivery_status = target.sfcDeliveryStatus;
+            }
+            target.updatedAt = getBstIsoString();
+            target.updatedBy = currentUser.value?.username || 'admin';
+            queueChange('orders', target);
+            saveOrdersLocally();
+            triggerAutoSync(true);
+            syncNotice.value = `↩️ Order #${target.id} marked as NOT delivered (reverted to "${revertedStatus}").`;
+            setTimeout(() => { if (syncNotice.value?.includes(target.id)) syncNotice.value = ''; }, 4000);
+            return;
+          }
+
+          // Mark as Delivered
+          target.previousStatus = (target.status !== 'Delivered' && target.status !== 'Partial Delivered') ? target.status : (target.previousStatus || 'Courier Pending');
+          target.previousSfcStatus = (target.sfcDeliveryStatus !== 'delivered') ? target.sfcDeliveryStatus : (target.previousSfcStatus || 'pending');
+          target.status = 'Delivered';
+          target.sfcDeliveryStatus = 'delivered';
+          target.manualDeliveredOverride = true;
+          target.deliveredAt = getBstIsoString();
+          if (sfcDeliveryStatuses.value && target.id) {
+            if (!sfcDeliveryStatuses.value[target.id]) sfcDeliveryStatuses.value[target.id] = {};
+            sfcDeliveryStatuses.value[target.id].delivery_status = 'delivered';
+          }
+          target.updatedAt = getBstIsoString();
+          target.updatedBy = currentUser.value?.username || 'admin';
+          queueChange('orders', target);
+          saveOrdersLocally();
+          triggerAutoSync(true);
+          syncNotice.value = `✅ Order #${target.id} marked as Delivered! Click button again anytime to undo.`;
+          setTimeout(() => { if (syncNotice.value?.includes(target.id)) syncNotice.value = ''; }, 4000);
+        };
+
         const confirmVoidOrder = (order) => {
           if (currentUser.value?.role === 'seller' && order.merchantName !== currentUser.value?.name && order.merchantId !== currentUser.value?.id) {
             alert("⚠️ Security restriction: You cannot void orders assigned to other merchants.");
@@ -5679,29 +6043,37 @@ const executeBulkFactoryDispatch = async () => {
             const toDeleteIds = Array.from(selectedOrders.value);
             const hasOthers = orders.value.some(o => toDeleteIds.includes(o.id) && o.merchantName !== currentUser.value?.name && o.merchantId !== currentUser.value?.id);
             if (hasOthers) {
-              alert("⚠️ Security restriction: You cannot void orders assigned to other merchants.");
+              syncNotice.value = "⚠️ Security restriction: You cannot void orders assigned to other merchants.";
+              setTimeout(() => { syncNotice.value = ''; }, 4000);
               return;
             }
           }
-          if (!confirm(`Are you sure you want to void ${selectedOrders.value.size} selected order(s)?`)) return;
-
-          const toDeleteIds = Array.from(selectedOrders.value);
-          const ordersToMove = orders.value.filter(o => toDeleteIds.includes(o.id));
-          
-          const now = getBstIsoString();
-          ordersToMove.forEach(o => {
-            o.deletedAt = now;
-            o.updatedAt = getBstIsoString();
-            o.updatedBy = currentUser.value?.username || 'user';
-            deletedOrders.value.unshift(o);
-            queueChange('deletedOrders', o);
-            queueDelete('orders', o.id);
-          });
-          
-          orders.value = orders.value.filter(o => !toDeleteIds.includes(o.id));
-          saveOrdersLocally();
-          saveDeletedOrdersLocally();
-          selectedOrders.value.clear();
+          openGlobalConfirm(
+            `Are you sure you want to void ${selectedOrders.value.size} selected order(s)?`,
+            'Void Selected Orders',
+            'bg-rose-600 hover:bg-rose-500 text-white',
+            () => {
+              const toDeleteIds = Array.from(selectedOrders.value);
+              const ordersToMove = orders.value.filter(o => toDeleteIds.includes(o.id));
+              
+              const now = getBstIsoString();
+              ordersToMove.forEach(o => {
+                o.deletedAt = now;
+                o.updatedAt = getBstIsoString();
+                o.updatedBy = currentUser.value?.username || 'user';
+                deletedOrders.value.unshift(o);
+                queueChange('deletedOrders', o);
+                queueDelete('orders', o.id);
+              });
+              
+              orders.value = orders.value.filter(o => !toDeleteIds.includes(o.id));
+              saveOrdersLocally();
+              saveDeletedOrdersLocally();
+              selectedOrders.value.clear();
+              triggerAutoSync(true);
+              closeModal();
+            }
+          );
         };
 
         // --- SETTINGS AND DIAGNOSTICS ---
@@ -5773,6 +6145,44 @@ Please click \"Copy Apps Script Code (V4)\", paste it in the Apps Script editor,
           } finally {
             isBackingUp.value = false;
           }
+        };
+
+        const saveFavicon = (url) => {
+          if (!url || !url.trim()) return;
+          const cleanUrl = url.trim();
+          customFavicon.value = cleanUrl;
+          localStorage.setItem('homeaura_favicon', cleanUrl);
+          applyFavicon(cleanUrl);
+          queueChange('settings', { id: 'app_favicon', value: cleanUrl, updatedAt: getBstIsoString() });
+          triggerAutoSync(true);
+          syncNotice.value = '🎨 App favicon successfully updated and synced!';
+          setTimeout(() => { syncNotice.value = ''; }, 4000);
+        };
+
+        const handleFaviconFileUpload = (event) => {
+          const file = event.target.files && event.target.files[0];
+          if (!file) return;
+          if (file.size > 2 * 1024 * 1024) {
+            alert('⚠️ Favicon image file should be under 2MB.');
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const dataUri = e.target.result;
+            saveFavicon(dataUri);
+          };
+          reader.readAsDataURL(file);
+        };
+
+        const resetFavicon = () => {
+          const defaultFavicon = 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 32 32\'><rect width=\'32\' height=\'32\' rx=\'8\' fill=\'%234F46E5\'/><path d=\'M16 6L6 14v12a2 2 0 002 2h5v-7h6v7h5a2 2 0 002-2V14L16 6z\' fill=\'%23FFFFFF\'/><circle cx=\'16\' cy=\'12\' r=\'2.5\' fill=\'%23F59E0B\'/></svg>';
+          customFavicon.value = '';
+          localStorage.removeItem('homeaura_favicon');
+          applyFavicon(defaultFavicon);
+          queueChange('settings', { id: 'app_favicon', value: '', updatedAt: getBstIsoString() });
+          triggerAutoSync(true);
+          syncNotice.value = 'Favicon restored to default.';
+          setTimeout(() => { syncNotice.value = ''; }, 4000);
         };
 
         const saveAdminWaGroupLink = async () => {
@@ -6398,12 +6808,13 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           }
           
           const filteredOrders = filterOrdersForDashboard(orders.value);
+          const validOrders = filteredOrders.filter(o => !isOrderCancelled(o) && o.status !== 'Returned Received');
           const daysMap = {};
           const nowBst = getBstDateString(new Date());
 
           if (dashboardFilter.dateRange === 'today') {
             const todayLabel = 'Today (' + nowBst + ')';
-            daysMap[todayLabel] = filteredOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+            daysMap[todayLabel] = validOrders.reduce((sum, o) => sum + (cleanNumber(o.saleAmount) || getOrderTotalAmount(o)), 0);
           } else if (dashboardFilter.dateRange === 'week') {
             const nowDate = new Date(nowBst + 'T00:00:00Z');
             for (let i = 6; i >= 0; i--) {
@@ -6412,25 +6823,27 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
               const displayDate = dStr.slice(5); // MM-DD
               daysMap[displayDate] = 0;
             }
-            filteredOrders.forEach(o => {
+            validOrders.forEach(o => {
               const rawDate = o.timestamp || o.createdAt || o.date || o.orderDate || o.updatedAt;
               const dateStr = getBstDateString(rawDate);
               if (dateStr) {
                 const displayDate = dateStr.slice(5);
+                const amt = cleanNumber(o.saleAmount) || getOrderTotalAmount(o);
                 if (daysMap[displayDate] !== undefined) {
-                  daysMap[displayDate] += (Number(o.totalAmount) || 0);
+                  daysMap[displayDate] += amt;
                 } else {
-                  daysMap[displayDate] = (Number(o.totalAmount) || 0);
+                  daysMap[displayDate] = amt;
                 }
               }
             });
           } else {
-            filteredOrders.forEach(o => {
+            validOrders.forEach(o => {
               const rawDate = o.timestamp || o.createdAt || o.date || o.orderDate || o.updatedAt;
               const dateStr = getBstDateString(rawDate);
               if (dateStr) {
                 const label = dateStr.slice(5);
-                daysMap[label] = (daysMap[label] || 0) + (Number(o.totalAmount) || 0);
+                const amt = cleanNumber(o.saleAmount) || getOrderTotalAmount(o);
+                daysMap[label] = (daysMap[label] || 0) + amt;
               }
             });
           }
@@ -7013,6 +7426,18 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           getFraudBadgeInfo,
           fetchFraudCheck,
           fetchFraudCheckForOrders,
+          allOrderStatuses,
+          isOrderDelivered,
+          isOrderPendingInFactory,
+          cancelOrder,
+          toggleOrderDelivered,
+          customFavicon,
+          faviconInputUrl,
+          isFaviconSaving,
+          applyFavicon,
+          saveFavicon,
+          handleFaviconFileUpload,
+          resetFavicon,
           openFraudDetailModal,
           refreshModalFraudCheck,
         };
