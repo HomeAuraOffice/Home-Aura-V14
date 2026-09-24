@@ -204,24 +204,44 @@
           }
         };
 
-        const isDateInDashboardRange = (dateInput, range) => {
-          if (!range || range === 'all') return true;
+        const isDateInDashboardRange = (dateInput, range = null, specificDate = null, customStartDate = null, customEndDate = null) => {
+          const effectiveRange = (range !== null && range !== undefined) ? range : (typeof dashboardFilter !== 'undefined' ? dashboardFilter.dateRange : 'all');
+          if (!effectiveRange || effectiveRange === 'all') return true;
           if (!dateInput) return false;
           const itemBst = getBstDateString(dateInput);
           if (!itemBst) return false;
           const nowBst = getBstDateString(new Date());
           if (!nowBst) return true;
 
-          if (range === 'today') {
+          if (effectiveRange === 'today') {
             return itemBst === nowBst;
           }
-          if (range === 'week') {
+          if (effectiveRange === 'yesterday') {
+            const yesterdayDate = new Date(new Date(nowBst + 'T00:00:00Z').getTime() - 24 * 60 * 60 * 1000);
+            const yestBst = getBstDateString(yesterdayDate);
+            return itemBst === yestBst;
+          }
+          if (effectiveRange === 'specific') {
+            const target = specificDate || (typeof dashboardFilter !== 'undefined' ? dashboardFilter.specificDate : null) || nowBst;
+            return itemBst === target;
+          }
+          if (effectiveRange === 'week') {
             const minDate = new Date(new Date(nowBst + 'T00:00:00Z').getTime() - 7 * 24 * 60 * 60 * 1000);
             const itemDate = new Date(itemBst + 'T12:00:00Z');
-            return itemDate >= minDate;
+            return itemDate >= minDate && itemBst <= nowBst;
           }
-          if (range === 'month') {
+          if (effectiveRange === 'month') {
             return itemBst.substring(0, 7) === nowBst.substring(0, 7);
+          }
+          if (effectiveRange === 'custom') {
+            const sDate = customStartDate || (typeof dashboardFilter !== 'undefined' ? dashboardFilter.startDate : null);
+            const eDate = customEndDate || (typeof dashboardFilter !== 'undefined' ? dashboardFilter.endDate : null);
+            if (sDate && eDate) {
+              return itemBst >= sDate && itemBst <= eDate;
+            }
+            if (sDate) return itemBst >= sDate;
+            if (eDate) return itemBst <= eDate;
+            return true;
           }
           return true;
         };
@@ -3388,14 +3408,66 @@
         // --- COMPUTED METRICS ---
         
         const dashboardFilter = reactive({
-          dateRange: 'all',
+          dateRange: 'all', // 'all', 'today', 'yesterday', 'specific', 'week', 'month', 'custom'
+          specificDate: getTodayBstDateString(),
+          startDate: getDaysAgoBstDateString(7),
+          endDate: getTodayBstDateString(),
           sellerId: 'all'
         });
+
+        const setDashboardDateRangePreset = (preset) => {
+          if (preset === 'today') {
+            dashboardFilter.dateRange = 'today';
+            dashboardFilter.specificDate = getTodayBstDateString();
+          } else if (preset === 'yesterday') {
+            dashboardFilter.dateRange = 'yesterday';
+            dashboardFilter.specificDate = getYesterdayBstDateString();
+          } else if (preset === 'specific') {
+            dashboardFilter.dateRange = 'specific';
+            if (!dashboardFilter.specificDate) dashboardFilter.specificDate = getTodayBstDateString();
+          } else if (preset === 'week') {
+            dashboardFilter.dateRange = 'week';
+          } else if (preset === 'month') {
+            dashboardFilter.dateRange = 'month';
+          } else if (preset === 'all') {
+            dashboardFilter.dateRange = 'all';
+          }
+        };
+
+        const filterDashboardToDate = (targetDate) => {
+          if (!targetDate) return;
+          dashboardFilter.dateRange = 'specific';
+          dashboardFilter.specificDate = targetDate;
+          activeTab.value = 'dashboard';
+        };
+
+        const calculateNetForOrder = (o) => {
+          if (!o) return 0;
+          const total = getOrderTotalAmount(o);
+          const deliveryExp = cleanNumber(o.deliveryCharge);
+          let codExp = 0;
+          if (o.codCharge !== undefined && o.codCharge !== null && o.codCharge !== '' && !isNaN(cleanNumber(o.codCharge)) && cleanNumber(o.codCharge) > 0) {
+            codExp = cleanNumber(o.codCharge);
+          } else {
+            codExp = Math.round(total * 0.01);
+          }
+          return Math.max(0, total - (deliveryExp + codExp));
+        };
 
         const filterOrdersForDashboard = (orderList) => {
           return (orderList || []).filter(o => {
             if (!o) return false;
-            // Apply seller filter
+
+            // Enforce seller isolation if currentUser is a seller
+            if (currentUser.value && currentUser.value.role === 'seller') {
+              const myId = String(currentUser.value.id || '').trim();
+              const myName = String(currentUser.value.name || '').trim().toLowerCase();
+              const mId = String(o.merchantId || '').trim();
+              const mName = String(o.merchantName || '').trim().toLowerCase();
+              if (mId !== myId && mName !== myName) return false;
+            }
+
+            // Apply seller filter for admins/moderators
             if (dashboardFilter.sellerId !== 'all') {
               const selId = String(dashboardFilter.sellerId).trim();
               const selUser = (users.value || []).find(u => String(u.id).trim() === selId);
@@ -3422,20 +3494,11 @@
               }
             }
             
-            // Apply date filter (delivered date for delivered orders, else creation/order date)
+            // Apply date filter (prioritize orderDate/timestamp/createdAt so backdated orders are placed on their logged date)
             if (dashboardFilter.dateRange !== 'all') {
-              const isDelivered = isOrderDelivered(o);
-              let primaryDate = null;
-              if (isDelivered && o.deliveredAt) {
-                primaryDate = o.deliveredAt;
-              }
-              if (!primaryDate) {
-                primaryDate = o.timestamp || o.createdAt || o.orderDate || o.date;
-              }
+              const primaryDate = o.orderDate || o.timestamp || o.createdAt || o.date || (isOrderDelivered(o) && o.deliveredAt) || o.updatedAt;
               if (primaryDate) {
-                if (!isDateInDashboardRange(primaryDate, dashboardFilter.dateRange)) return false;
-              } else if (o.updatedAt) {
-                if (!isDateInDashboardRange(o.updatedAt, dashboardFilter.dateRange)) return false;
+                if (!isDateInDashboardRange(primaryDate, dashboardFilter.dateRange, dashboardFilter.specificDate, dashboardFilter.startDate, dashboardFilter.endDate)) return false;
               } else {
                 return false;
               }
@@ -3447,18 +3510,6 @@
         const metrics = computed(() => {
           const filteredOrders = filterOrdersForDashboard(orders.value);
           
-          const calculateNetForOrder = (o) => {
-            const total = getOrderTotalAmount(o);
-            const deliveryExp = cleanNumber(o.deliveryCharge);
-            let codExp = 0;
-            if (o.codCharge !== undefined && o.codCharge !== null && o.codCharge !== '' && !isNaN(cleanNumber(o.codCharge)) && cleanNumber(o.codCharge) > 0) {
-              codExp = cleanNumber(o.codCharge);
-            } else {
-              codExp = Math.round(total * 0.01);
-            }
-            return Math.max(0, total - (deliveryExp + codExp));
-          };
-
           // Cancelled and Void orders MUST NOT be included in Gross Revenue
           const validOrders = filteredOrders.filter(o => !isOrderCancelled(o) && o.status !== 'Returned Received');
           const grossRevenue = validOrders.reduce((acc, o) => acc + calculateNetForOrder(o), 0);
@@ -3486,7 +3537,15 @@
           } else {
             allSellers = allSellers.filter(u => !u.excludeFromGlobalAnalytics);
           }
-          const target = allSellers.reduce((sum, u) => sum + (cleanNumber(u.target) || 0), 0);
+
+          let target = 0;
+          if (dashboardFilter.dateRange === 'today' || dashboardFilter.dateRange === 'yesterday' || dashboardFilter.dateRange === 'specific') {
+            target = allSellers.reduce((sum, u) => sum + (cleanNumber(u.dailyTarget) > 0 ? cleanNumber(u.dailyTarget) : (cleanNumber(u.target) > 0 ? Math.round(cleanNumber(u.target) / 30) : 10000)), 0);
+          } else if (dashboardFilter.dateRange === 'week') {
+            target = allSellers.reduce((sum, u) => sum + ((cleanNumber(u.dailyTarget) > 0 ? cleanNumber(u.dailyTarget) : (cleanNumber(u.target) > 0 ? Math.round(cleanNumber(u.target) / 30) : 10000)) * 7), 0);
+          } else {
+            target = allSellers.reduce((sum, u) => sum + (cleanNumber(u.target) || 300000), 0);
+          }
           
           const filteredOrders = filterOrdersForDashboard(orders.value);
           const validOrders = filteredOrders.filter(o => !isOrderCancelled(o) && o.status !== 'Returned Received');
@@ -3582,7 +3641,15 @@
             });
             const validOrders = sellerOrders.filter(o => !isOrderCancelled(o) && o.status !== 'Returned Received');
             const totalSales = validOrders.reduce((acc, o) => acc + (cleanNumber(o.saleAmount) || getOrderTotalAmount(o)), 0);
-            const target = cleanNumber(seller.target) || 300000;
+            const dailyTarget = cleanNumber(seller.dailyTarget) > 0 ? cleanNumber(seller.dailyTarget) : (cleanNumber(seller.target) > 0 ? Math.round(cleanNumber(seller.target) / 30) : 10000);
+            const monthlyTarget = cleanNumber(seller.target) || 300000;
+            
+            let target = monthlyTarget;
+            if (dashboardFilter.dateRange === 'today' || dashboardFilter.dateRange === 'yesterday' || dashboardFilter.dateRange === 'specific') {
+              target = dailyTarget;
+            } else if (dashboardFilter.dateRange === 'week') {
+              target = dailyTarget * 7;
+            }
             const percentage = target > 0 ? Math.round((totalSales / target) * 100) : 0;
             
             const totalDelivered = sellerOrders.filter(o => isOrderDelivered(o) && !isOrderCancelled(o)).length;
@@ -3590,6 +3657,7 @@
             const totalPending = sellerOrders.filter(o => !isOrderDelivered(o) && !isOrderCancelled(o) && o.status !== 'Returned Received').length;
             
             return {
+              id: seller.id,
               username: seller?.username,
               name: seller.name,
               totalOrders: sellerOrders.filter(o => !isOrderCancelled(o)).length,
@@ -3598,6 +3666,8 @@
               totalPending,
               totalSales,
               target,
+              dailyTarget,
+              monthlyTarget,
               percentage
             };
           });
@@ -3709,6 +3779,453 @@
           }
           return spends.reduce((sum, s) => sum + cleanNumber(s.amount), 0);
         });
+
+        // --- DATE-WISE SALES BREAKDOWN & SPECIFIC DATE INSIGHTS ---
+        const dateWiseBreakdownFilter = ref('14days'); // '7days', '14days', '30days', 'this_month', 'all'
+        const dateWiseSearch = ref('');
+        const selectedDateDetails = reactive({
+          date: '',
+          formattedDate: '',
+          dayLabel: '',
+          totalOrders: 0,
+          grossRevenue: 0,
+          deliveredRevenue: 0,
+          deliveredCount: 0,
+          pendingCount: 0,
+          cancelledCount: 0,
+          urgentCount: 0,
+          backdatedCount: 0,
+          adSpend: 0,
+          netProfit: 0,
+          orders: []
+        });
+
+        const openDateOrdersModal = (day) => {
+          if (!day) return;
+          selectedDateDetails.date = day.date;
+          selectedDateDetails.formattedDate = day.formattedDate;
+          selectedDateDetails.dayLabel = day.dayLabel;
+          selectedDateDetails.totalOrders = day.totalOrders;
+          selectedDateDetails.grossRevenue = day.grossRevenue;
+          selectedDateDetails.deliveredRevenue = day.deliveredRevenue;
+          selectedDateDetails.deliveredCount = day.deliveredCount;
+          selectedDateDetails.pendingCount = day.pendingCount;
+          selectedDateDetails.cancelledCount = day.cancelledCount;
+          selectedDateDetails.urgentCount = day.urgentCount;
+          selectedDateDetails.backdatedCount = day.backdatedOrdersCount;
+          selectedDateDetails.adSpend = day.adSpend;
+          selectedDateDetails.netProfit = day.netProfit;
+          selectedDateDetails.orders = day.orders || [];
+          activeModal.value = 'specificDateOrdersModal';
+        };
+
+        const dateWiseSalesBreakdown = computed(() => {
+          let baseOrders = orders.value || [];
+          // Apply seller scoping if selected
+          if (dashboardFilter.sellerId !== 'all') {
+            const selId = String(dashboardFilter.sellerId).trim();
+            const selUser = (users.value || []).find(u => String(u.id).trim() === selId);
+            baseOrders = baseOrders.filter(o => {
+              const mId = String(o.merchantId || '').trim();
+              const mName = String(o.merchantName || '').trim().toLowerCase();
+              return (mId && mId === selId) || 
+                     (mName && mName === selId.toLowerCase()) ||
+                     (selUser && (
+                       (mId && mId === String(selUser.id).trim()) ||
+                       (mName && mName === String(selUser.name || '').trim().toLowerCase()) ||
+                       (selUser.username && mName === String(selUser.username).trim().toLowerCase())
+                     ));
+            });
+          } else {
+            // Respect exclusions
+            if (users.value) {
+              baseOrders = baseOrders.filter(o => {
+                const seller = users.value.find(u => 
+                  (o.merchantId && String(u.id).trim() === String(o.merchantId).trim()) ||
+                  (o.merchantName && String(u.name || '').trim().toLowerCase() === String(o.merchantName).trim().toLowerCase())
+                );
+                if (seller && seller.excludeFromGlobalAnalytics) return false;
+                return true;
+              });
+            }
+          }
+
+          // If current user is a seller, only show their own orders
+          if (currentUser.value && currentUser.value.role === 'seller') {
+            const myId = String(currentUser.value.id || '').trim();
+            const myName = String(currentUser.value.name || '').trim().toLowerCase();
+            baseOrders = baseOrders.filter(o => {
+              const mId = String(o.merchantId || '').trim();
+              const mName = String(o.merchantName || '').trim().toLowerCase();
+              return (mId && mId === myId) || (mName && mName === myName);
+            });
+          }
+
+          const dailyMap = {};
+
+          baseOrders.forEach(o => {
+            if (!o) return;
+            const orderDateStr = o.orderDate || getBstDateString(o.timestamp) || getBstDateString(o.createdAt) || getBstDateString(o.date);
+            if (!orderDateStr) return;
+
+            if (!dailyMap[orderDateStr]) {
+              dailyMap[orderDateStr] = {
+                date: orderDateStr,
+                totalOrders: 0,
+                backdatedOrdersCount: 0,
+                grossRevenue: 0,
+                deliveredRevenue: 0,
+                deliveredCount: 0,
+                pendingCount: 0,
+                cancelledCount: 0,
+                urgentCount: 0,
+                orders: []
+              };
+            }
+
+            const dayObj = dailyMap[orderDateStr];
+            dayObj.orders.push(o);
+
+            const isCancelled = isOrderCancelled(o) || o.status === 'Returned Received';
+            const isDelivered = isOrderDelivered(o);
+
+            if (o.isBackdated || (o.orderDate && o.orderDate !== getBstDateString(o.createdAt || o.updatedAt))) {
+              dayObj.backdatedOrdersCount += 1;
+            }
+
+            if (!isCancelled) {
+              dayObj.totalOrders += 1;
+              const netAmount = calculateNetForOrder(o);
+              dayObj.grossRevenue += netAmount;
+
+              if (isDelivered) {
+                dayObj.deliveredCount += 1;
+                dayObj.deliveredRevenue += netAmount;
+              } else {
+                dayObj.pendingCount += 1;
+              }
+
+              if (o.urgent) {
+                dayObj.urgentCount += 1;
+              }
+            } else {
+              dayObj.cancelledCount += 1;
+            }
+          });
+
+          // Also get marketing spends
+          let spends = marketingSpends.value || [];
+          if (dashboardFilter.sellerId !== 'all') {
+            spends = spends.filter(s => String(s.sellerId).trim() === String(dashboardFilter.sellerId).trim());
+          }
+
+          const todayStr = getTodayBstDateString();
+          const yesterdayStr = getYesterdayBstDateString();
+
+          // Ensure today and yesterday are always present
+          if (!dailyMap[todayStr]) {
+            dailyMap[todayStr] = {
+              date: todayStr,
+              totalOrders: 0,
+              backdatedOrdersCount: 0,
+              grossRevenue: 0,
+              deliveredRevenue: 0,
+              deliveredCount: 0,
+              pendingCount: 0,
+              cancelledCount: 0,
+              urgentCount: 0,
+              orders: []
+            };
+          }
+          if (!dailyMap[yesterdayStr]) {
+            dailyMap[yesterdayStr] = {
+              date: yesterdayStr,
+              totalOrders: 0,
+              backdatedOrdersCount: 0,
+              grossRevenue: 0,
+              deliveredRevenue: 0,
+              deliveredCount: 0,
+              pendingCount: 0,
+              cancelledCount: 0,
+              urgentCount: 0,
+              orders: []
+            };
+          }
+
+          const daysArray = Object.values(dailyMap).map(day => {
+            const daySpends = spends.filter(s => (s.date || getBstDateString(s.createdAt)) === day.date);
+            const adSpend = daySpends.reduce((sum, s) => sum + cleanNumber(s.amount), 0);
+            const netProfit = day.grossRevenue - adSpend;
+            const aov = day.totalOrders > 0 ? Math.round(day.grossRevenue / day.totalOrders) : 0;
+
+            let dayLabel = '';
+            if (day.date === todayStr) {
+              dayLabel = '⚡ Today';
+            } else if (day.date === yesterdayStr) {
+              dayLabel = '📅 Yesterday';
+            } else {
+              try {
+                const d = new Date(day.date + 'T12:00:00Z');
+                dayLabel = d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'Asia/Dhaka' });
+              } catch(e) {
+                dayLabel = '';
+              }
+            }
+
+            return {
+              ...day,
+              adSpend,
+              netProfit,
+              aov,
+              dayLabel,
+              formattedDate: formatDisplayDateOnly(day.date)
+            };
+          });
+
+          // Sort descending by date (most recent first)
+          daysArray.sort((a, b) => b.date.localeCompare(a.date));
+          return daysArray;
+        });
+
+        const filteredDateWiseSalesBreakdown = computed(() => {
+          let list = dateWiseSalesBreakdown.value || [];
+          const nowBst = getTodayBstDateString();
+
+          if (dateWiseBreakdownFilter.value === '7days') {
+            const minDate = getDaysAgoBstDateString(7);
+            list = list.filter(d => d.date >= minDate && d.date <= nowBst);
+          } else if (dateWiseBreakdownFilter.value === '14days') {
+            const minDate = getDaysAgoBstDateString(14);
+            list = list.filter(d => d.date >= minDate && d.date <= nowBst);
+          } else if (dateWiseBreakdownFilter.value === '30days') {
+            const minDate = getDaysAgoBstDateString(30);
+            list = list.filter(d => d.date >= minDate && d.date <= nowBst);
+          } else if (dateWiseBreakdownFilter.value === 'this_month') {
+            const curMonth = nowBst.substring(0, 7);
+            list = list.filter(d => d.date.substring(0, 7) === curMonth);
+          }
+
+          if (dateWiseSearch.value && dateWiseSearch.value.trim()) {
+            const q = dateWiseSearch.value.trim().toLowerCase();
+            list = list.filter(d => 
+              d.date.toLowerCase().includes(q) || 
+              (d.dayLabel && d.dayLabel.toLowerCase().includes(q)) ||
+              (d.formattedDate && d.formattedDate.toLowerCase().includes(q))
+            );
+          }
+
+          return list;
+        });
+
+        // --- DAILY SALES TARGETS & INDIVIDUAL SELLER PROGRESS TRACKING ---
+        const dailyTargetDate = ref(getTodayBstDateString());
+        const targetModalData = reactive({
+          sellerId: null,
+          sellerName: '',
+          dailyTarget: 10000,
+          monthlyTarget: 300000,
+          bulkTargets: {}
+        });
+
+        const setDailyTargetDatePreset = (preset) => {
+          if (preset === 'today') {
+            dailyTargetDate.value = getTodayBstDateString();
+          } else if (preset === 'yesterday') {
+            dailyTargetDate.value = getYesterdayBstDateString();
+          } else if (preset === 'sync_dashboard') {
+            dailyTargetDate.value = dashboardFilter.specificDate || getTodayBstDateString();
+          }
+        };
+
+        const sellerDailyProgressList = computed(() => {
+          let targetSellers = sellersList.value || [];
+          if (currentUser.value?.role === 'marketer' && currentUser.value?.visibleSellers) {
+            targetSellers = targetSellers.filter(s => currentUser.value.visibleSellers.includes(s.id));
+          }
+          if (currentUser.value?.role === 'seller') {
+            targetSellers = targetSellers.filter(s => 
+              String(s.id).trim() === String(currentUser.value.id).trim() ||
+              String(s.name || '').trim().toLowerCase() === String(currentUser.value.name || '').trim().toLowerCase()
+            );
+          } else if (dashboardFilter.sellerId !== 'all') {
+            targetSellers = targetSellers.filter(s => String(s.id).trim() === String(dashboardFilter.sellerId).trim());
+          } else {
+            targetSellers = targetSellers.filter(s => !s.excludeFromGlobalAnalytics);
+          }
+
+          const targetDate = dailyTargetDate.value || getTodayBstDateString();
+          const allOrders = orders.value || [];
+
+          return targetSellers.map(seller => {
+            const sId = String(seller.id || '').trim();
+            const sName = String(seller.name || '').trim().toLowerCase();
+            const sUser = String(seller.username || '').trim().toLowerCase();
+
+            const dailyTarget = cleanNumber(seller.dailyTarget) > 0 
+              ? cleanNumber(seller.dailyTarget) 
+              : (cleanNumber(seller.target) > 0 ? Math.round(cleanNumber(seller.target) / 30) : 10000);
+            const monthlyTarget = cleanNumber(seller.target) || 300000;
+
+            const sellerDayOrders = allOrders.filter(o => {
+              if (!o) return false;
+              const mId = String(o.merchantId || '').trim();
+              const mName = String(o.merchantName || '').trim().toLowerCase();
+              const matchesSeller = (mId && mId === sId) || (mName && (mName === sName || mName === sUser));
+              if (!matchesSeller) return false;
+
+              const oDate = o.orderDate || getBstDateString(o.timestamp) || getBstDateString(o.createdAt) || getBstDateString(o.date);
+              return oDate === targetDate;
+            });
+
+            const validOrders = sellerDayOrders.filter(o => !isOrderCancelled(o) && o.status !== 'Returned Received');
+            const totalSales = validOrders.reduce((sum, o) => sum + (cleanNumber(o.saleAmount) || getOrderTotalAmount(o)), 0);
+            const deliveredOrders = sellerDayOrders.filter(o => isOrderDelivered(o) && !isOrderCancelled(o));
+            const deliveredCount = deliveredOrders.length;
+            const deliveredRevenue = deliveredOrders.reduce((sum, o) => sum + calculateNetForOrder(o), 0);
+            const cancelledCount = sellerDayOrders.filter(o => isOrderCancelled(o) || o.status === 'Returned Received').length;
+            const pendingCount = sellerDayOrders.filter(o => !isOrderDelivered(o) && !isOrderCancelled(o) && o.status !== 'Returned Received').length;
+            const urgentCount = sellerDayOrders.filter(o => o.urgent && !isOrderCancelled(o)).length;
+
+            const percentage = dailyTarget > 0 ? Math.round((totalSales / dailyTarget) * 100) : 0;
+            const isTargetAchieved = totalSales >= dailyTarget && dailyTarget > 0;
+            const remaining = Math.max(0, dailyTarget - totalSales);
+            const surplus = Math.max(0, totalSales - dailyTarget);
+            const aov = validOrders.length > 0 ? Math.round(totalSales / validOrders.length) : 0;
+
+            let dayLabel = '';
+            if (targetDate === getTodayBstDateString()) {
+              dayLabel = 'Today';
+            } else if (targetDate === getYesterdayBstDateString()) {
+              dayLabel = 'Yesterday';
+            }
+
+            return {
+              id: seller.id,
+              name: seller.name,
+              username: seller.username,
+              avatarInitials: (seller.name || 'SE').substring(0, 2).toUpperCase(),
+              dailyTarget,
+              monthlyTarget,
+              totalSales,
+              ordersCount: validOrders.length,
+              deliveredCount,
+              deliveredRevenue,
+              cancelledCount,
+              pendingCount,
+              urgentCount,
+              percentage,
+              isTargetAchieved,
+              remaining,
+              surplus,
+              aov,
+              targetDate,
+              dayLabel,
+              orders: sellerDayOrders
+            };
+          });
+        });
+
+        const teamDailyTargetSummary = computed(() => {
+          const list = sellerDailyProgressList.value || [];
+          const totalDailyTarget = list.reduce((sum, s) => sum + cleanNumber(s.dailyTarget), 0);
+          const totalDailySales = list.reduce((sum, s) => sum + cleanNumber(s.totalSales), 0);
+          const percentage = totalDailyTarget > 0 ? Math.round((totalDailySales / totalDailyTarget) * 100) : 0;
+          const sellersAchievedCount = list.filter(s => s.isTargetAchieved).length;
+          const totalOrdersCount = list.reduce((sum, s) => sum + s.ordersCount, 0);
+          const totalDeliveredCount = list.reduce((sum, s) => sum + s.deliveredCount, 0);
+          const totalDeliveredRevenue = list.reduce((sum, s) => sum + s.deliveredRevenue, 0);
+          const surplus = Math.max(0, totalDailySales - totalDailyTarget);
+          const remaining = Math.max(0, totalDailyTarget - totalDailySales);
+
+          return {
+            totalDailyTarget,
+            totalDailySales,
+            percentage,
+            sellersCount: list.length,
+            sellersAchievedCount,
+            totalOrdersCount,
+            totalDeliveredCount,
+            totalDeliveredRevenue,
+            surplus,
+            remaining,
+            isTeamTargetAchieved: totalDailySales >= totalDailyTarget && totalDailyTarget > 0
+          };
+        });
+
+        const openDailyTargetModal = (seller = null) => {
+          if (seller) {
+            targetModalData.sellerId = seller.id;
+            targetModalData.sellerName = seller.name;
+            targetModalData.dailyTarget = seller.dailyTarget || 10000;
+            targetModalData.monthlyTarget = seller.monthlyTarget || 300000;
+          } else {
+            targetModalData.sellerId = null;
+            targetModalData.sellerName = 'All Active Sellers';
+            const bulk = {};
+            (sellersList.value || []).forEach(s => {
+              bulk[s.id] = cleanNumber(s.dailyTarget) > 0 ? cleanNumber(s.dailyTarget) : (cleanNumber(s.target) > 0 ? Math.round(cleanNumber(s.target) / 30) : 10000);
+            });
+            targetModalData.bulkTargets = bulk;
+          }
+          activeModal.value = 'dailySalesTargetsModal';
+        };
+
+        const saveSellerDailyTarget = (sellerId, targetAmount) => {
+          const cleanTarget = Math.max(0, cleanNumber(targetAmount));
+          const user = users.value.find(u => u && String(u.id).trim() === String(sellerId).trim());
+          if (user) {
+            user.dailyTarget = cleanTarget;
+            user.updatedAt = getBstIsoString();
+            user.updatedBy = currentUser.value?.username || 'admin';
+            if (!user.target || user.target === 0) {
+              user.target = cleanTarget * 30;
+            }
+            queueChange('users', user);
+            saveUsersLocally();
+            if (currentUser.value && String(currentUser.value.id).trim() === String(sellerId).trim()) {
+              currentUser.value.dailyTarget = cleanTarget;
+            }
+          }
+        };
+
+        const saveAllDailyTargets = () => {
+          if (targetModalData.sellerId) {
+            saveSellerDailyTarget(targetModalData.sellerId, targetModalData.dailyTarget);
+          } else {
+            Object.keys(targetModalData.bulkTargets || {}).forEach(sId => {
+              saveSellerDailyTarget(sId, targetModalData.bulkTargets[sId]);
+            });
+          }
+          closeModal();
+        };
+
+        const quickAdjustSellerDailyTarget = (sellerId, delta) => {
+          const user = users.value.find(u => u && String(u.id).trim() === String(sellerId).trim());
+          if (user) {
+            const current = cleanNumber(user.dailyTarget) > 0 ? cleanNumber(user.dailyTarget) : (cleanNumber(user.target) > 0 ? Math.round(cleanNumber(user.target) / 30) : 10000);
+            const updated = Math.max(1000, current + delta);
+            saveSellerDailyTarget(sellerId, updated);
+          }
+        };
+
+        const openSellerDayOrdersModal = (sellerProgress) => {
+          if (!sellerProgress) return;
+          selectedDateDetails.date = sellerProgress.targetDate;
+          selectedDateDetails.formattedDate = formatDisplayDateOnly(sellerProgress.targetDate);
+          selectedDateDetails.dayLabel = (sellerProgress.dayLabel ? sellerProgress.dayLabel + ' • ' : '') + sellerProgress.name;
+          selectedDateDetails.totalOrders = sellerProgress.ordersCount;
+          selectedDateDetails.grossRevenue = sellerProgress.totalSales;
+          selectedDateDetails.deliveredRevenue = sellerProgress.deliveredRevenue;
+          selectedDateDetails.deliveredCount = sellerProgress.deliveredCount;
+          selectedDateDetails.pendingCount = sellerProgress.pendingCount;
+          selectedDateDetails.cancelledCount = sellerProgress.cancelledCount;
+          selectedDateDetails.urgentCount = sellerProgress.urgentCount;
+          selectedDateDetails.backdatedCount = (sellerProgress.orders || []).filter(o => o.isBackdated).length;
+          selectedDateDetails.adSpend = 0;
+          selectedDateDetails.netProfit = sellerProgress.totalSales;
+          selectedDateDetails.orders = sellerProgress.orders || [];
+          activeModal.value = 'specificDateOrdersModal';
+        };
 
         const myOrders = computed(() => {
           if (!currentUser.value) return [];
@@ -7162,14 +7679,16 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
         // --- USER PROFILE MANAGEMENT ---
         const openAddUserModal = () => {
           modalData.title = 'Register New User Profile';
-          modalData.user = reactive({ name: '', username: '', password: '1234', role: 'seller', active: true, target: 300000, visibleSellers: [], pagePrefix: '' });
+          modalData.user = reactive({ name: '', username: '', password: '1234', role: 'seller', active: true, target: 300000, dailyTarget: 10000, visibleSellers: [], pagePrefix: '' });
           modalData.showPassword = false;
           activeModal.value = 'userModal';
         };
 
         const openEditUserModal = (user) => {
           modalData.title = `Edit Profile: @${user?.username}`;
-          modalData.user = reactive({ ...user, visibleSellers: user.visibleSellers || [] });
+          const curTarget = cleanNumber(user?.target) || 300000;
+          const curDailyTarget = cleanNumber(user?.dailyTarget) > 0 ? cleanNumber(user?.dailyTarget) : Math.round(curTarget / 30);
+          modalData.user = reactive({ ...user, target: curTarget, dailyTarget: curDailyTarget, visibleSellers: user.visibleSellers || [] });
           modalData.showPassword = false;
           activeModal.value = 'userModal';
         };
@@ -7240,6 +7759,13 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           if (dashboardFilter.dateRange === 'today') {
             const todayLabel = 'Today (' + nowBst + ')';
             daysMap[todayLabel] = validOrders.reduce((sum, o) => sum + (cleanNumber(o.saleAmount) || getOrderTotalAmount(o)), 0);
+          } else if (dashboardFilter.dateRange === 'yesterday') {
+            const yestBst = getYesterdayBstDateString();
+            const yestLabel = 'Yesterday (' + yestBst + ')';
+            daysMap[yestLabel] = validOrders.reduce((sum, o) => sum + (cleanNumber(o.saleAmount) || getOrderTotalAmount(o)), 0);
+          } else if (dashboardFilter.dateRange === 'specific') {
+            const specLabel = 'Date (' + (dashboardFilter.specificDate || nowBst) + ')';
+            daysMap[specLabel] = validOrders.reduce((sum, o) => sum + (cleanNumber(o.saleAmount) || getOrderTotalAmount(o)), 0);
           } else if (dashboardFilter.dateRange === 'week') {
             const nowDate = new Date(nowBst + 'T00:00:00Z');
             for (let i = 6; i >= 0; i--) {
@@ -7443,7 +7969,7 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
         });
 
         // Watchers for Charts
-        watch([() => dashboardFilter.dateRange, () => dashboardFilter.sellerId, activeTab, isSidebarCollapsed], () => {
+        watch([() => dashboardFilter.dateRange, () => dashboardFilter.specificDate, () => dashboardFilter.startDate, () => dashboardFilter.endDate, () => dashboardFilter.sellerId, activeTab, isSidebarCollapsed], () => {
           if (activeTab.value === 'dashboard') {
             setTimeout(() => { // ensure DOM layout is updated
               renderChart();
@@ -7728,6 +8254,26 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           metrics, globalSalesProgress,
           sellersList,
           merchantStats, steadfastReport, dashboardFilter,
+          setDashboardDateRangePreset,
+          filterDashboardToDate,
+          dateWiseBreakdownFilter,
+          dateWiseSearch,
+          selectedDateDetails,
+          openDateOrdersModal,
+          dateWiseSalesBreakdown,
+          filteredDateWiseSalesBreakdown,
+          dailyTargetDate,
+          targetModalData,
+          setDailyTargetDatePreset,
+          sellerDailyProgressList,
+          teamDailyTargetSummary,
+          openDailyTargetModal,
+          saveSellerDailyTarget,
+          saveAllDailyTargets,
+          quickAdjustSellerDailyTarget,
+          openSellerDayOrdersModal,
+          getYesterdayBstDateString,
+          getDaysAgoBstDateString,
           factoryBillStats,
           sellerBillStats,
           totalFactoryBillsAmount,

@@ -995,6 +995,26 @@
               <!-- Seller Navigation Tabs -->
               <template v-else>
                 <button
+                  @click="activeTab = 'dashboard'"
+                  :class="activeTab === 'dashboard' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-100 font-medium'"
+                  class="px-3.5 py-2.5 rounded-lg text-xs transition-all flex items-center gap-3 w-full text-left"
+                >
+                  <svg
+                    class="w-5 h-5 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                    />
+                  </svg>
+                  <span v-show="!isSidebarCollapsed">My Sales Analytics</span>
+                </button>
+                <button
                   @click="activeTab = 'intake'"
                   :class="activeTab === 'intake' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-100 font-medium'"
                   class="px-3.5 py-2.5 rounded-lg text-xs transition-all flex items-center gap-3 w-full text-left"
@@ -1368,6 +1388,13 @@
               </template>
               <template v-else>
                 <button
+                  @click="activeTab = 'dashboard'"
+                  :class="activeTab === 'dashboard' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-slate-600 dark:text-slate-300'"
+                  class="px-3 py-1.5 rounded-lg text-xs whitespace-nowrap"
+                >
+                  Analytics
+                </button>
+                <button
                   @click="activeTab = 'intake'"
                   :class="activeTab === 'intake' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-semibold' : 'text-slate-600 dark:text-slate-300'"
                   class="px-3 py-1.5 rounded-lg text-xs whitespace-nowrap"
@@ -1425,7 +1452,7 @@
             <!-- ==================== ADMIN: ANALYTICS DASHBOARD ==================== -->
             <transition name="pane-fade" mode="out-in">
               <div
-                v-if="(currentUser.role === 'admin' || currentUser.role === 'moderator' || currentUser.role === 'marketer') && activeTab === 'dashboard'"
+                v-if="(currentUser.role === 'admin' || currentUser.role === 'moderator' || currentUser.role === 'marketer' || currentUser.role === 'seller') && activeTab === 'dashboard'"
                 key="admin-dash"
                 class="space-y-6"
               >
@@ -1466,44 +1493,133 @@
 
                 <!-- Dashboard Filters -->
                 <div
-                  class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row gap-4 mb-6"
+                  class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col gap-4 mb-6"
                 >
-                  <div class="flex-1">
-                    <label
-                      class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1"
-                      >Time Period</label
-                    >
-                    <select
-                      v-model="dashboardFilter.dateRange"
-                      class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none"
-                    >
-                      <option value="all">All Time</option>
-                      <option value="today">Today</option>
-                      <option value="week">Past 7 Days</option>
-                      <option value="month">This Month</option>
-                    </select>
-                  </div>
-                  <div
-                    class="flex-1"
-                    v-if="currentUser.role === 'admin' || currentUser.role === 'moderator' || currentUser.role === 'marketer'"
-                  >
-                    <label
-                      class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1"
-                      >Specific User</label
-                    >
-                    <select
-                      v-model="dashboardFilter.sellerId"
-                      class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none"
-                    >
-                      <option value="all">All Users</option>
-                      <option
-                        v-for="seller in sellersList"
-                        :key="seller.id"
-                        :value="seller.id"
+                  <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="flex-1">
+                      <label
+                        class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1"
+                        >Time Period</label
                       >
-                        {{ seller.name }} (@{{ seller?.username }})
-                      </option>
-                    </select>
+                      <select
+                        v-model="dashboardFilter.dateRange"
+                        class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      >
+                        <option value="all">🌐 All Time</option>
+                        <option value="today">⚡ Today</option>
+                        <option value="yesterday">📅 Yesterday</option>
+                        <option value="specific">🎯 Specific Date</option>
+                        <option value="week">📊 Past 7 Days</option>
+                        <option value="month">🗓️ This Month</option>
+                        <option value="custom">🛠️ Custom Date Range</option>
+                      </select>
+                    </div>
+                    <div
+                      class="flex-1"
+                      v-if="currentUser.role === 'admin' || currentUser.role === 'moderator' || currentUser.role === 'marketer'"
+                    >
+                      <label
+                        class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1"
+                        >Specific User / Seller</label
+                      >
+                      <select
+                        v-model="dashboardFilter.sellerId"
+                        class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 rounded-xl text-sm font-semibold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                      >
+                        <option value="all">All Users</option>
+                        <option
+                          v-for="seller in sellersList"
+                          :key="seller.id"
+                          :value="seller.id"
+                        >
+                          {{ seller.name }} (@{{ seller?.username }})
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Specific Date Selector (when dateRange === 'specific') -->
+                  <div
+                    v-if="dashboardFilter.dateRange === 'specific'"
+                    class="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3 bg-indigo-50/50 dark:bg-indigo-950/20 p-3 rounded-xl border border-indigo-100 dark:border-indigo-900/40"
+                  >
+                    <div class="flex items-center gap-3">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                          <svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Select Specific Date:
+                        </span>
+                        <input
+                          type="date"
+                          v-model="dashboardFilter.specificDate"
+                          class="bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-700 text-slate-900 dark:text-slate-100 text-xs font-semibold px-3 py-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
+                        />
+                      </div>
+                      <span class="text-xs text-indigo-700 dark:text-indigo-300 font-medium hidden sm:inline">
+                        (Viewing metrics & orders for: <span class="font-bold underline">{{ dashboardFilter.specificDate }}</span>)
+                      </span>
+                    </div>
+
+                    <!-- Quick Preset Chips -->
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        @click="dashboardFilter.specificDate = getTodayBstDateString()"
+                        :class="dashboardFilter.specificDate === getTodayBstDateString() ? 'bg-indigo-600 text-white font-bold' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700'"
+                        class="px-2.5 py-1 text-[11px] rounded-lg transition-all shadow-2xs"
+                      >
+                        Today
+                      </button>
+                      <button
+                        type="button"
+                        @click="dashboardFilter.specificDate = getYesterdayBstDateString()"
+                        :class="dashboardFilter.specificDate === getYesterdayBstDateString() ? 'bg-indigo-600 text-white font-bold' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700'"
+                        class="px-2.5 py-1 text-[11px] rounded-lg transition-all shadow-2xs"
+                      >
+                        Yesterday
+                      </button>
+                      <button
+                        type="button"
+                        @click="dashboardFilter.specificDate = getDaysAgoBstDateString(2)"
+                        :class="dashboardFilter.specificDate === getDaysAgoBstDateString(2) ? 'bg-indigo-600 text-white font-bold' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700'"
+                        class="px-2.5 py-1 text-[11px] rounded-lg transition-all shadow-2xs"
+                      >
+                        2 Days Ago
+                      </button>
+                      <button
+                        type="button"
+                        @click="dashboardFilter.specificDate = getDaysAgoBstDateString(3)"
+                        :class="dashboardFilter.specificDate === getDaysAgoBstDateString(3) ? 'bg-indigo-600 text-white font-bold' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700'"
+                        class="px-2.5 py-1 text-[11px] rounded-lg transition-all shadow-2xs"
+                      >
+                        3 Days Ago
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Custom Date Range Selector (when dateRange === 'custom') -->
+                  <div
+                    v-if="dashboardFilter.dateRange === 'custom'"
+                    class="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center gap-4 bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl border border-slate-200 dark:border-slate-700"
+                  >
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-bold text-slate-700 dark:text-slate-300">From Date:</span>
+                      <input
+                        type="date"
+                        v-model="dashboardFilter.startDate"
+                        class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-xs font-semibold px-3 py-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-xs font-bold text-slate-700 dark:text-slate-300">To Date:</span>
+                      <input
+                        type="date"
+                        v-model="dashboardFilter.endDate"
+                        class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-xs font-semibold px-3 py-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1595,6 +1711,354 @@
                     >
                       Based on combined seller targets for {{ dashboardFilter.sellerId === 'all' ? 'all sellers' : 'selected seller' }}.
                     </p>
+                  </div>
+
+                  <!-- DAILY SALES TARGETS & INDIVIDUAL SELLER PROGRESS TRACKER -->
+                  <div
+                    class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs mb-6 overflow-hidden smooth-card"
+                  >
+                    <!-- Header Bar -->
+                    <div class="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div class="flex items-center gap-3">
+                        <span class="p-2.5 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400">
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                        </span>
+                        <div>
+                          <div class="flex items-center gap-2">
+                            <h2 class="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                              Daily Sales Targets & Seller Progress
+                            </h2>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/50 dark:border-indigo-800/50">
+                              Live Tracker
+                            </span>
+                          </div>
+                          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            Set and monitor daily sales quotas with real-time visual progress indicators for each seller
+                          </p>
+                        </div>
+                      </div>
+
+                      <!-- Date & Action Controls -->
+                      <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                        <!-- Quick Day Presets -->
+                        <div class="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200/60 dark:border-slate-700/60 text-xs font-semibold">
+                          <button
+                            type="button"
+                            @click="setDailyTargetDatePreset('today')"
+                            :class="dailyTargetDate === getTodayBstDateString() ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+                            class="px-2.5 py-1 rounded-lg transition-all text-xs font-bold cursor-pointer"
+                          >
+                            ⚡ Today
+                          </button>
+                          <button
+                            type="button"
+                            @click="setDailyTargetDatePreset('yesterday')"
+                            :class="dailyTargetDate === getYesterdayBstDateString() ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+                            class="px-2.5 py-1 rounded-lg transition-all text-xs font-bold cursor-pointer"
+                          >
+                            📅 Yesterday
+                          </button>
+                        </div>
+
+                        <!-- Date Picker Input -->
+                        <input
+                          v-model="dailyTargetDate"
+                          type="date"
+                          class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 text-xs font-semibold px-2.5 py-1.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+
+                        <!-- Configure Targets Button -->
+                        <button
+                          type="button"
+                          @click="openDailyTargetModal()"
+                          class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 cursor-pointer shrink-0"
+                        >
+                          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                          </svg>
+                          <span>🎯 Set Daily Targets</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Team Aggregate Summary Strip -->
+                    <div class="bg-slate-50/70 dark:bg-slate-800/40 p-5 border-b border-slate-100 dark:border-slate-800">
+                      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                        <!-- Total Daily Quota -->
+                        <div class="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+                          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Team Daily Goal</span>
+                          <span class="text-base font-black text-slate-900 dark:text-slate-100 tracking-tight">৳{{ formatBDT(teamDailyTargetSummary.totalDailyTarget) }}</span>
+                          <span class="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">Across {{ teamDailyTargetSummary.sellersCount }} seller quotas</span>
+                        </div>
+
+                        <!-- Achieved Daily Sales -->
+                        <div class="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+                          <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider block">Live Daily Sales</span>
+                          <span class="text-base font-black text-emerald-600 dark:text-emerald-400 tracking-tight">৳{{ formatBDT(teamDailyTargetSummary.totalDailySales) }}</span>
+                          <span class="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">{{ teamDailyTargetSummary.totalOrdersCount }} valid orders</span>
+                        </div>
+
+                        <!-- Team Pacing / Percentage -->
+                        <div class="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+                          <span class="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block">Team Pacing</span>
+                          <div class="flex items-center gap-2">
+                            <span class="text-base font-black text-indigo-600 dark:text-indigo-400 tracking-tight">{{ teamDailyTargetSummary.percentage }}%</span>
+                            <span
+                              v-if="teamDailyTargetSummary.isTeamTargetAchieved"
+                              class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                            >
+                              Hit!
+                            </span>
+                          </div>
+                          <span class="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                            {{ teamDailyTargetSummary.isTeamTargetAchieved ? '+৳' + formatBDT(teamDailyTargetSummary.surplus) + ' surplus' : '৳' + formatBDT(teamDailyTargetSummary.remaining) + ' to hit target' }}
+                          </span>
+                        </div>
+
+                        <!-- Sellers on Target -->
+                        <div class="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+                          <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider block">Sellers on Target</span>
+                          <span class="text-base font-black text-amber-600 dark:text-amber-400 tracking-tight">{{ teamDailyTargetSummary.sellersAchievedCount }} / {{ teamDailyTargetSummary.sellersCount }}</span>
+                          <span class="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                            {{ teamDailyTargetSummary.sellersAchievedCount === teamDailyTargetSummary.sellersCount && teamDailyTargetSummary.sellersCount > 0 ? '🏆 All sellers hit goal!' : teamDailyTargetSummary.sellersAchievedCount + ' achieved target' }}
+                          </span>
+                        </div>
+                      </div>
+
+                      <!-- Team Progress Bar -->
+                      <div>
+                        <div class="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1.5">
+                          <span>Overall Daily Pacing Progress</span>
+                          <span class="font-bold text-slate-900 dark:text-slate-100">{{ teamDailyTargetSummary.percentage }}%</span>
+                        </div>
+                        <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner p-0.5">
+                          <div
+                            class="h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden"
+                            :class="teamDailyTargetSummary.isTeamTargetAchieved ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-green-500' : 'bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600'"
+                            :style="{ width: Math.min(100, teamDailyTargetSummary.percentage) + '%' }"
+                          >
+                            <div
+                              class="absolute inset-0 bg-white/20 w-full h-full moving-shimmer-bar"
+                              style="
+                                background-image: linear-gradient(
+                                  45deg,
+                                  rgba(255, 255, 255, 0.15) 25%,
+                                  transparent 25%,
+                                  transparent 50%,
+                                  rgba(255, 255, 255, 0.15) 50%,
+                                  rgba(255, 255, 255, 0.15) 75%,
+                                  transparent 75%,
+                                  transparent
+                                );
+                                background-size: 1rem 1rem;
+                                animation: stripemove 1s linear infinite;
+                              "
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Individual Seller Visual Progress Cards Grid -->
+                    <div class="p-5">
+                      <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                          <span class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                            Individual Seller Performance ({{ sellerDailyProgressList.length }} Sellers)
+                          </span>
+                        </div>
+                        <span class="text-[11px] text-slate-400">
+                          Date: <strong class="text-slate-700 dark:text-slate-300 font-mono">{{ dailyTargetDate }}</strong>
+                        </span>
+                      </div>
+
+                      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        <div
+                          v-for="seller in sellerDailyProgressList"
+                          :key="seller.id"
+                          class="bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4.5 transition-all hover:shadow-md flex flex-col justify-between"
+                        >
+                          <!-- Top Seller Header -->
+                          <div>
+                            <div class="flex items-center justify-between gap-2 mb-3">
+                              <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-black shadow-xs shrink-0">
+                                  {{ seller.avatarInitials }}
+                                </div>
+                                <div class="min-w-0">
+                                  <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                                    {{ seller.name }}
+                                  </h4>
+                                  <span class="text-[11px] text-slate-400 font-mono block truncate">
+                                    @{{ seller.username }}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <!-- Dynamic Status Pill -->
+                              <span
+                                v-if="seller.isTargetAchieved"
+                                class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/60 shrink-0 flex items-center gap-1 shadow-xs"
+                              >
+                                <span>🎉 Target Hit</span>
+                                <span v-if="seller.surplus > 0" class="text-[9px] font-semibold opacity-90">(+৳{{ formatBDT(seller.surplus) }})</span>
+                              </span>
+                              <span
+                                v-else-if="seller.percentage >= 75"
+                                class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-indigo-100 text-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-300/60 dark:border-indigo-800/60 shrink-0"
+                              >
+                                ⚡ Final Push
+                              </span>
+                              <span
+                                v-else-if="seller.percentage >= 50"
+                                class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800/60 shrink-0"
+                              >
+                                ⏳ Halfway
+                              </span>
+                              <span
+                                v-else
+                                class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 shrink-0"
+                              >
+                                🏃 Underway
+                              </span>
+                            </div>
+
+                            <!-- Sales vs Target Amount Block -->
+                            <div class="flex items-baseline justify-between mb-2">
+                              <div>
+                                <span class="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">
+                                  ৳{{ formatBDT(seller.totalSales) }}
+                                </span>
+                                <span class="text-xs text-slate-500 dark:text-slate-400 font-semibold ml-1">
+                                  / ৳{{ formatBDT(seller.dailyTarget) }} goal
+                                </span>
+                              </div>
+                              <span
+                                class="text-sm font-black"
+                                :class="seller.isTargetAchieved ? 'text-emerald-600 dark:text-emerald-400' : (seller.percentage >= 75 ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300')"
+                              >
+                                {{ seller.percentage }}%
+                              </span>
+                            </div>
+
+                            <!-- Visual Dynamic Progress Bar Indicator -->
+                            <div class="mb-2">
+                              <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 overflow-hidden shadow-inner p-0.5">
+                                <div
+                                  class="h-full rounded-full transition-all duration-700 ease-out relative overflow-hidden"
+                                  :class="seller.isTargetAchieved ? 'bg-gradient-to-r from-emerald-500 via-teal-400 to-green-500 shadow-sm shadow-emerald-500/50' : (seller.percentage >= 75 ? 'bg-gradient-to-r from-indigo-500 to-cyan-400' : (seller.percentage >= 50 ? 'bg-gradient-to-r from-amber-500 to-yellow-400' : 'bg-gradient-to-r from-rose-500 to-amber-500'))"
+                                  :style="{ width: Math.min(100, seller.percentage) + '%' }"
+                                >
+                                  <div
+                                    class="absolute inset-0 bg-white/25 w-full h-full moving-shimmer-bar"
+                                    style="
+                                      background-image: linear-gradient(
+                                        45deg,
+                                        rgba(255, 255, 255, 0.2) 25%,
+                                        transparent 25%,
+                                        transparent 50%,
+                                        rgba(255, 255, 255, 0.2) 50%,
+                                        rgba(255, 255, 255, 0.2) 75%,
+                                        transparent 75%,
+                                        transparent
+                                      );
+                                      background-size: 1rem 1rem;
+                                      animation: stripemove 1s linear infinite;
+                                    "
+                                  ></div>
+                                </div>
+                              </div>
+                              <div class="flex items-center justify-between text-[11px] mt-1 text-slate-500 dark:text-slate-400">
+                                <span v-if="seller.isTargetAchieved" class="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                                  <span>🚀</span> Exceeded target by ৳{{ formatBDT(seller.surplus) }}
+                                </span>
+                                <span v-else class="text-slate-500 dark:text-slate-400">
+                                  ৳{{ formatBDT(seller.remaining) }} remaining
+                                </span>
+                                <span class="font-mono text-[10px]">
+                                  Monthly: ৳{{ formatBDT(seller.monthlyTarget) }}
+                                </span>
+                              </div>
+                            </div>
+
+                            <!-- Mini Activity Chips -->
+                            <div class="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-200/60 dark:border-slate-700/60 mb-3 text-center">
+                              <div class="bg-white dark:bg-slate-900/80 p-1.5 rounded-lg border border-slate-200/50 dark:border-slate-800">
+                                <span class="text-[9px] text-slate-400 uppercase font-bold block">Orders</span>
+                                <span class="text-xs font-black text-slate-900 dark:text-slate-100">{{ seller.ordersCount }}</span>
+                              </div>
+                              <div class="bg-white dark:bg-slate-900/80 p-1.5 rounded-lg border border-slate-200/50 dark:border-slate-800">
+                                <span class="text-[9px] text-slate-400 uppercase font-bold block">Delivered</span>
+                                <span class="text-xs font-black text-blue-600 dark:text-blue-400">{{ seller.deliveredCount }}</span>
+                              </div>
+                              <div class="bg-white dark:bg-slate-900/80 p-1.5 rounded-lg border border-slate-200/50 dark:border-slate-800">
+                                <span class="text-[9px] text-slate-400 uppercase font-bold block">AOV</span>
+                                <span class="text-xs font-black text-indigo-600 dark:text-indigo-400">৳{{ formatBDT(seller.aov) }}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <!-- Action Controls (Micro adjustments, Edit Target, View Orders) -->
+                          <div class="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between gap-2">
+                            <!-- Quick Micro-Target Delta Buttons -->
+                            <div class="flex items-center gap-1">
+                              <span class="text-[10px] text-slate-400 font-semibold mr-0.5">Target:</span>
+                              <button
+                                type="button"
+                                @click="quickAdjustSellerDailyTarget(seller.id, -1000)"
+                                class="px-1.5 py-0.5 bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded font-mono text-[10px] font-bold cursor-pointer"
+                                title="Decrease daily target by ৳1,000"
+                              >
+                                -1k
+                              </button>
+                              <button
+                                type="button"
+                                @click="quickAdjustSellerDailyTarget(seller.id, 1000)"
+                                class="px-1.5 py-0.5 bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded font-mono text-[10px] font-bold cursor-pointer"
+                                title="Increase daily target by ৳1,000"
+                              >
+                                +1k
+                              </button>
+                              <button
+                                type="button"
+                                @click="quickAdjustSellerDailyTarget(seller.id, 5000)"
+                                class="px-1.5 py-0.5 bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 rounded font-mono text-[10px] font-bold cursor-pointer"
+                                title="Increase daily target by ৳5,000"
+                              >
+                                +5k
+                              </button>
+                            </div>
+
+                            <div class="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                @click="openDailyTargetModal(seller)"
+                                class="px-2 py-1 bg-white hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg text-[10px] font-bold cursor-pointer transition-all"
+                                title="Set exact custom target"
+                              >
+                                ✏️ Set
+                              </button>
+                              <button
+                                type="button"
+                                @click="openSellerDayOrdersModal(seller)"
+                                class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 rounded-lg text-[10px] font-bold cursor-pointer transition-all flex items-center gap-1"
+                              >
+                                <span>👁️ Orders</span>
+                                <span class="bg-indigo-600 text-white text-[9px] px-1 rounded-full font-mono">{{ seller.ordersCount }}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+
+                        <!-- Empty state if no sellers -->
+                        <div v-if="sellerDailyProgressList.length === 0" class="col-span-full py-12 text-center text-slate-400">
+                          <p class="font-bold text-sm">No active sellers found for this filter.</p>
+                          <p class="text-xs mt-1">Select "All Sellers" or add active seller profiles in Settings.</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- Financial Metrics Cards Grid -->
@@ -2100,6 +2564,237 @@
                     </div>
                   </div>
 
+                  <!-- Date-Wise Sales Performance Matrix Card -->
+                  <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden smooth-card">
+                    <div class="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/60 dark:bg-slate-800/30">
+                      <div>
+                        <div class="flex items-center gap-2">
+                          <span class="p-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </span>
+                          <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                            Specific Date-Wise Sales Performance Matrix
+                          </h3>
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Daily sales logs, delivered conversion rates, marketing spends, net margins, and retroactive backdated orders.
+                        </p>
+                      </div>
+
+                      <!-- Filter Tabs & Quick Search -->
+                      <div class="flex flex-wrap items-center gap-2.5">
+                        <!-- Quick Day Range Filter -->
+                        <div class="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl text-xs font-semibold">
+                          <button
+                            type="button"
+                            @click="dateWiseBreakdownFilter = '7days'"
+                            :class="dateWiseBreakdownFilter === '7days' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+                            class="px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                          >
+                            7 Days
+                          </button>
+                          <button
+                            type="button"
+                            @click="dateWiseBreakdownFilter = '14days'"
+                            :class="dateWiseBreakdownFilter === '14days' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+                            class="px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                          >
+                            14 Days
+                          </button>
+                          <button
+                            type="button"
+                            @click="dateWiseBreakdownFilter = '30days'"
+                            :class="dateWiseBreakdownFilter === '30days' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+                            class="px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                          >
+                            30 Days
+                          </button>
+                          <button
+                            type="button"
+                            @click="dateWiseBreakdownFilter = 'this_month'"
+                            :class="dateWiseBreakdownFilter === 'this_month' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+                            class="px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                          >
+                            This Month
+                          </button>
+                          <button
+                            type="button"
+                            @click="dateWiseBreakdownFilter = 'all'"
+                            :class="dateWiseBreakdownFilter === 'all' ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'"
+                            class="px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                          >
+                            All Time
+                          </button>
+                        </div>
+
+                        <!-- Date Search -->
+                        <div class="relative w-40">
+                          <input
+                            type="text"
+                            v-model="dateWiseSearch"
+                            placeholder="Filter date..."
+                            class="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Date-wise Table -->
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400 font-bold border-b border-slate-200/80 dark:border-slate-700/80">
+                          <tr>
+                            <th class="py-3 px-4">Date</th>
+                            <th class="py-3 px-4 text-center">Orders Logged</th>
+                            <th class="py-3 px-4 text-right">Gross Sales</th>
+                            <th class="py-3 px-4 text-center">Delivered Orders</th>
+                            <th class="py-3 px-4 text-right">Delivered Revenue</th>
+                            <th class="py-3 px-4 text-center">Pending / Cancelled</th>
+                            <th class="py-3 px-4 text-right">Marketing Spend</th>
+                            <th class="py-3 px-4 text-right">Net Margin</th>
+                            <th class="py-3 px-4 text-center">Specific Date Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                          <tr
+                            v-for="day in filteredDateWiseSalesBreakdown"
+                            :key="day.date"
+                            class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                            :class="{'bg-indigo-50/40 dark:bg-indigo-950/30': dashboardFilter.dateRange === 'specific' && dashboardFilter.specificDate === day.date}"
+                          >
+                            <!-- Date & Day -->
+                            <td class="py-3 px-4">
+                              <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-slate-900 dark:text-slate-100">
+                                  {{ day.formattedDate }}
+                                </span>
+                                <span
+                                  v-if="day.dayLabel"
+                                  :class="day.dayLabel.includes('Today') ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300' : (day.dayLabel.includes('Yesterday') ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400')"
+                                  class="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                                >
+                                  {{ day.dayLabel }}
+                                </span>
+                                <span
+                                  v-if="day.backdatedOrdersCount > 0"
+                                  title="Orders logged with a retroactive order date for this day"
+                                  class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 flex items-center gap-0.5 whitespace-nowrap"
+                                >
+                                  ⏱️ {{ day.backdatedOrdersCount }} backdated
+                                </span>
+                              </div>
+                              <div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
+                                {{ day.date }}
+                              </div>
+                            </td>
+
+                            <!-- Total Orders -->
+                            <td class="py-3 px-4 text-center">
+                              <div class="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                                {{ day.totalOrders }}
+                              </div>
+                              <span v-if="day.urgentCount > 0" class="text-[10px] font-bold text-rose-500 block">
+                                🔥 {{ day.urgentCount }} urgent
+                              </span>
+                            </td>
+
+                            <!-- Gross Sales -->
+                            <td class="py-3 px-4 text-right">
+                              <div class="font-bold text-slate-900 dark:text-slate-100">
+                                ৳{{ formatBDT(day.grossRevenue) }}
+                              </div>
+                              <div class="text-[10px] text-slate-400 font-medium">
+                                AOV: ৳{{ formatBDT(day.aov) }}
+                              </div>
+                            </td>
+
+                            <!-- Delivered Orders -->
+                            <td class="py-3 px-4 text-center">
+                              <div class="flex items-center justify-center gap-1">
+                                <span class="font-bold text-emerald-600 dark:text-emerald-400">
+                                  {{ day.deliveredCount }}
+                                </span>
+                                <span class="text-[10px] text-slate-400">
+                                  ({{ day.totalOrders > 0 ? Math.round((day.deliveredCount / day.totalOrders) * 100) : 0 }}%)
+                                </span>
+                              </div>
+                            </td>
+
+                            <!-- Delivered Revenue -->
+                            <td class="py-3 px-4 text-right">
+                              <div class="font-semibold text-emerald-600 dark:text-emerald-400">
+                                ৳{{ formatBDT(day.deliveredRevenue) }}
+                              </div>
+                            </td>
+
+                            <!-- Pending / Cancelled -->
+                            <td class="py-3 px-4 text-center">
+                              <div class="flex items-center justify-center gap-1.5">
+                                <span class="text-amber-600 dark:text-amber-400 font-semibold" title="Pending Dispatch / In Transit">
+                                  {{ day.pendingCount }} P
+                                </span>
+                                <span class="text-slate-300 dark:text-slate-600">/</span>
+                                <span class="text-rose-500 dark:text-rose-400 font-semibold" title="Cancelled / Returned">
+                                  {{ day.cancelledCount }} C
+                                </span>
+                              </div>
+                            </td>
+
+                            <!-- Ad Spend -->
+                            <td class="py-3 px-4 text-right">
+                              <span :class="day.adSpend > 0 ? 'text-slate-700 dark:text-slate-300 font-medium' : 'text-slate-400'">
+                                ৳{{ formatBDT(day.adSpend) }}
+                              </span>
+                            </td>
+
+                            <!-- Net Margin -->
+                            <td class="py-3 px-4 text-right">
+                              <span
+                                :class="day.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-rose-400 font-bold'"
+                              >
+                                ৳{{ formatBDT(day.netProfit) }}
+                              </span>
+                            </td>
+
+                            <!-- Actions -->
+                            <td class="py-3 px-4 text-center">
+                              <div class="flex items-center justify-center gap-1.5">
+                                <button
+                                  type="button"
+                                  @click="openDateOrdersModal(day)"
+                                  class="px-2.5 py-1 text-[11px] font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:hover:bg-indigo-900/60 dark:text-indigo-300 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                  title="View individual orders logged for this date"
+                                >
+                                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                  Orders ({{ day.orders.length }})
+                                </button>
+                                <button
+                                  type="button"
+                                  @click="filterDashboardToDate(day.date)"
+                                  class="px-2 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                  title="Filter entire analytics dashboard to this date"
+                                >
+                                  🎯 Filter Day
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          <tr v-if="filteredDateWiseSalesBreakdown.length === 0">
+                            <td colspan="9" class="py-8 text-center text-slate-400 dark:text-slate-500">
+                              No sales records found for the selected date criteria.
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
                   <!-- Factory & Seller Bill Summaries -->
                   <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <!-- Factory-wise Bills -->
@@ -2563,13 +3258,22 @@
                         Live Sales Volume measured against assigned Target Goals
                       </p>
                     </div>
-                    <button
-                      v-if="currentUser.role === 'admin' || currentUser.role === 'moderator'"
-                      @click="activeTab = 'settings'"
-                      class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
-                    >
-                      Manage Targets &rarr;
-                    </button>
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        @click="openDailyTargetModal()"
+                        class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        🎯 Set Daily Targets
+                      </button>
+                      <button
+                        v-if="currentUser.role === 'admin' || currentUser.role === 'moderator'"
+                        @click="activeTab = 'settings'"
+                        class="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                      >
+                        Manage Profiles &rarr;
+                      </button>
+                    </div>
                   </div>
 
                   <div class="space-y-5">
@@ -6409,12 +7113,19 @@
                 >
                   <div>
                     <h2
-                      class="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"
+                      class="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap"
                     >
                       <span>My Submitted Order Logs</span>
                       <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold">
                         {{ filteredMyOrders.length }} orders
                       </span>
+                      <button
+                        type="button"
+                        @click="activeTab = 'dashboard'"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:hover:bg-indigo-900/60 dark:text-indigo-300 text-[11px] font-bold rounded-lg transition-all cursor-pointer shadow-2xs"
+                      >
+                        📊 Date-Wise Analytics
+                      </button>
                     </h2>
                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                       Locked history view of orders logged by {{ currentUser?.name }}
@@ -10094,16 +10805,38 @@
                   </div>
                   <div
                     v-if="modalData.user.role === 'seller' || modalData.user.role === 'moderator'"
+                    class="grid grid-cols-1 sm:grid-cols-2 gap-3"
                   >
-                    <label
-                      class="block font-semibold text-slate-700 dark:text-slate-300 mb-1"
-                      >Monthly Target Goal (BDT)</label
-                    >
-                    <input
-                      v-model.number="modalData.user.target"
-                      type="number"
-                      class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 rounded-xl font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none"
-                    />
+                    <div>
+                      <div class="flex items-center justify-between mb-1">
+                        <label class="block font-semibold text-slate-700 dark:text-slate-300">Monthly Target (BDT)</label>
+                      </div>
+                      <input
+                        v-model.number="modalData.user.target"
+                        type="number"
+                        placeholder="300000"
+                        class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl font-bold text-indigo-600 dark:text-indigo-400 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <div class="flex items-center justify-between mb-1">
+                        <label class="block font-semibold text-slate-700 dark:text-slate-300">Daily Target (BDT)</label>
+                        <button
+                          type="button"
+                          @click="modalData.user.dailyTarget = Math.round((modalData.user.target || 300000) / 30)"
+                          class="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-bold"
+                          title="Calculate from Monthly ÷ 30"
+                        >
+                          Auto (÷30)
+                        </button>
+                      </div>
+                      <input
+                        v-model.number="modalData.user.dailyTarget"
+                        type="number"
+                        placeholder="10000"
+                        class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2.5 rounded-xl font-bold text-emerald-600 dark:text-emerald-400 focus:outline-none"
+                      />
+                    </div>
                   </div>
                   <div
                     v-if="modalData.user.role === 'marketer'"
@@ -11230,6 +11963,348 @@
                         Save Reminder
                       </button>
                     </div>
+                  </div>
+                </div>
+
+                <!-- SPECIFIC DATE ORDERS AUDIT MODAL -->
+                <div
+                  v-if="activeModal === 'specificDateOrdersModal'"
+                  class="space-y-4 text-xs"
+                >
+                  <!-- Header with Date & summary stats -->
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">
+                          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </span>
+                        <div>
+                          <h3 class="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                            Orders for {{ selectedDateDetails.formattedDate }}
+                          </h3>
+                          <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                            {{ selectedDateDetails.dayLabel ? selectedDateDetails.dayLabel + ' • ' : '' }}Date: {{ selectedDateDetails.date }} (BST)
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        @click="filterDashboardToDate(selectedDateDetails.date); closeModal();"
+                        class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all text-xs flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 cursor-pointer"
+                      >
+                        🎯 Apply Filter To Dashboard
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Quick KPI Chips -->
+                  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                    <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
+                      <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Orders</span>
+                      <span class="text-sm font-extrabold text-slate-900 dark:text-slate-100">{{ selectedDateDetails.totalOrders }}</span>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/40">
+                      <span class="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase tracking-wider block">Gross Sales</span>
+                      <span class="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">৳{{ formatBDT(selectedDateDetails.grossRevenue) }}</span>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40">
+                      <span class="text-[10px] text-blue-700 dark:text-blue-400 font-bold uppercase tracking-wider block">Delivered</span>
+                      <span class="text-sm font-extrabold text-blue-600 dark:text-blue-400">{{ selectedDateDetails.deliveredCount }} (৳{{ formatBDT(selectedDateDetails.deliveredRevenue) }})</span>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40">
+                      <span class="text-[10px] text-amber-700 dark:text-amber-400 font-bold uppercase tracking-wider block">Pending</span>
+                      <span class="text-sm font-extrabold text-amber-600 dark:text-amber-400">{{ selectedDateDetails.pendingCount }}</span>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200/60 dark:border-rose-900/40">
+                      <span class="text-[10px] text-rose-700 dark:text-rose-400 font-bold uppercase tracking-wider block">Cancelled</span>
+                      <span class="text-sm font-extrabold text-rose-600 dark:text-rose-400">{{ selectedDateDetails.cancelledCount }}</span>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/60 dark:border-purple-900/40">
+                      <span class="text-[10px] text-purple-700 dark:text-purple-400 font-bold uppercase tracking-wider block">Backdated</span>
+                      <span class="text-sm font-extrabold text-purple-600 dark:text-purple-400">{{ selectedDateDetails.backdatedCount }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Order List / Table -->
+                  <div class="max-h-[55vh] overflow-y-auto pr-1 border border-slate-200 dark:border-slate-800 rounded-xl divide-y divide-slate-100 dark:divide-slate-800">
+                    <div
+                      v-for="order in selectedDateDetails.orders"
+                      :key="order.id"
+                      class="p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div class="space-y-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <span class="font-mono font-bold text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-md border border-indigo-200 dark:border-indigo-800">
+                            #{{ order.id }}
+                          </span>
+                          <span class="font-bold text-slate-900 dark:text-slate-100 text-xs">
+                            {{ order.customerName || 'No Name' }}
+                          </span>
+                          <span class="text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                            {{ order.phone }}
+                          </span>
+                          <span
+                            v-if="order.isBackdated || (order.orderDate && order.orderDate !== getBstDateString(order.createdAt || order.updatedAt))"
+                            class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300"
+                            title="Retroactively logged for this date"
+                          >
+                            ⏱️ Backdated
+                          </span>
+                          <span
+                            v-if="order.urgent"
+                            class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300"
+                          >
+                            🔥 Urgent
+                          </span>
+                        </div>
+                        <div class="text-[11px] text-slate-600 dark:text-slate-400 flex items-center gap-2 flex-wrap">
+                          <span><strong>Items:</strong> {{ order.products?.length || 1 }} product(s) ({{ order.products?.[0]?.name || order.itemDetails || 'Order Items' }})</span>
+                          <span>•</span>
+                          <span><strong>Seller:</strong> {{ order.merchantName || 'Unassigned' }}</span>
+                          <span v-if="order.factoryTag">• <strong>Factory:</strong> {{ order.factoryTag }}</span>
+                        </div>
+                      </div>
+
+                      <div class="flex items-center gap-3 shrink-0 justify-between sm:justify-end">
+                        <div class="text-right">
+                          <div class="text-xs font-black text-slate-900 dark:text-slate-100">
+                            ৳{{ formatBDT(cleanNumber(order.saleAmount) || getOrderTotalAmount(order)) }}
+                          </div>
+                          <div class="flex items-center gap-1 justify-end mt-0.5">
+                            <span
+                              :class="isOrderDelivered(order) ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300' : (isOrderCancelled(order) ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300')"
+                              class="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                            >
+                              {{ order.status || 'Pending' }}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          @click="closeModal(); openEditOrderModal(order)"
+                          class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-all text-xs cursor-pointer"
+                        >
+                          View / Edit
+                        </button>
+                      </div>
+                    </div>
+
+                    <div v-if="selectedDateDetails.orders.length === 0" class="py-10 text-center text-slate-400">
+                      No individual orders found for this date.
+                    </div>
+                  </div>
+
+                  <!-- Footer -->
+                  <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <span class="text-[11px] text-slate-400">
+                      Showing {{ selectedDateDetails.orders.length }} logged orders for {{ selectedDateDetails.date }}
+                    </span>
+                    <button
+                      type="button"
+                      @click="closeModal"
+                      class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-all text-xs cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+
+                <!-- DAILY SALES TARGETS CONFIGURATION MODAL -->
+                <div
+                  v-if="activeModal === 'dailySalesTargetsModal'"
+                  class="space-y-4 text-xs"
+                >
+                  <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                    <div class="flex items-center gap-2">
+                      <span class="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </span>
+                      <div>
+                        <h3 class="text-base font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                          Configure Daily Sales Targets
+                        </h3>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                          {{ targetModalData.sellerId ? 'Adjust daily sales quota for ' + targetModalData.sellerName : 'Set individual daily sales quotas for all active sellers' }}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      @click="closeModal"
+                      class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <!-- Single Seller Edit Mode -->
+                  <div v-if="targetModalData.sellerId" class="space-y-4 py-2">
+                    <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80">
+                      <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-slate-700 dark:text-slate-300">Seller Profile:</span>
+                        <span class="text-xs font-black text-indigo-600 dark:text-indigo-400">{{ targetModalData.sellerName }}</span>
+                      </div>
+                      <div class="flex items-center justify-between text-slate-500 dark:text-slate-400 text-[11px]">
+                        <span>Monthly Target Reference:</span>
+                        <span class="font-mono font-bold">৳{{ formatBDT(targetModalData.monthlyTarget) }}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div class="flex items-center justify-between mb-1.5">
+                        <label class="block font-bold text-slate-700 dark:text-slate-300">
+                          Daily Target Amount (BDT)
+                        </label>
+                        <button
+                          type="button"
+                          @click="targetModalData.dailyTarget = Math.round((targetModalData.monthlyTarget || 300000) / 30)"
+                          class="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer"
+                        >
+                          Auto: Monthly ÷ 30 (৳{{ formatBDT(Math.round((targetModalData.monthlyTarget || 300000) / 30)) }})
+                        </button>
+                      </div>
+                      <div class="relative">
+                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400">৳</span>
+                        <input
+                          v-model.number="targetModalData.dailyTarget"
+                          type="number"
+                          step="500"
+                          min="0"
+                          class="w-full pl-8 pr-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-black text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- Quick Presets -->
+                    <div>
+                      <label class="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">
+                        Quick Amount Presets
+                      </label>
+                      <div class="grid grid-cols-4 gap-2">
+                        <button
+                          v-for="preset in [5000, 10000, 15000, 20000, 25000, 30000, 40000, 50000]"
+                          :key="preset"
+                          type="button"
+                          @click="targetModalData.dailyTarget = preset"
+                          :class="targetModalData.dailyTarget === preset ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'"
+                          class="py-1.5 px-2 rounded-lg font-bold text-xs transition-all cursor-pointer"
+                        >
+                          ৳{{ formatBDT(preset) }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- All Sellers Bulk Mode -->
+                  <div v-else class="space-y-4 py-1">
+                    <!-- Quick Bulk Actions -->
+                    <div class="flex items-center justify-between gap-2 p-3 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40">
+                      <span class="text-xs font-semibold text-indigo-900 dark:text-indigo-200">
+                        ⚡ Quick Fill All:
+                      </span>
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          @click="(sellersList || []).forEach(s => targetModalData.bulkTargets[s.id] = 10000)"
+                          class="px-2 py-1 bg-white dark:bg-slate-800 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 rounded text-[11px] font-bold border border-indigo-200 dark:border-indigo-800 cursor-pointer"
+                        >
+                          All ৳10K
+                        </button>
+                        <button
+                          type="button"
+                          @click="(sellersList || []).forEach(s => targetModalData.bulkTargets[s.id] = 15000)"
+                          class="px-2 py-1 bg-white dark:bg-slate-800 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 rounded text-[11px] font-bold border border-indigo-200 dark:border-indigo-800 cursor-pointer"
+                        >
+                          All ৳15K
+                        </button>
+                        <button
+                          type="button"
+                          @click="(sellersList || []).forEach(s => targetModalData.bulkTargets[s.id] = 20000)"
+                          class="px-2 py-1 bg-white dark:bg-slate-800 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 rounded text-[11px] font-bold border border-indigo-200 dark:border-indigo-800 cursor-pointer"
+                        >
+                          All ৳20K
+                        </button>
+                        <button
+                          type="button"
+                          @click="(sellersList || []).forEach(s => targetModalData.bulkTargets[s.id] = Math.round((cleanNumber(s.target) || 300000) / 30))"
+                          class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[11px] font-bold cursor-pointer"
+                        >
+                          Auto: Monthly ÷ 30
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Sellers Table -->
+                    <div class="max-h-[50vh] overflow-y-auto pr-1 border border-slate-200 dark:border-slate-800 rounded-xl divide-y divide-slate-100 dark:divide-slate-800">
+                      <div
+                        v-for="seller in sellersList"
+                        :key="seller.id"
+                        class="p-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div class="flex items-center gap-2.5">
+                          <div class="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold text-xs flex items-center justify-center shrink-0">
+                            {{ (seller.name || 'SE').substring(0,2).toUpperCase() }}
+                          </div>
+                          <div>
+                            <span class="font-bold text-slate-900 dark:text-slate-100 text-xs block">
+                              {{ seller.name }}
+                            </span>
+                            <span class="text-[10px] text-slate-400 font-mono">
+                              @{{ seller.username }} • Monthly: ৳{{ formatBDT(cleanNumber(seller.target) || 300000) }}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div class="flex items-center gap-2 shrink-0">
+                          <div class="relative w-36">
+                            <span class="absolute left-2.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-xs">৳</span>
+                            <input
+                              v-model.number="targetModalData.bulkTargets[seller.id]"
+                              type="number"
+                              step="500"
+                              min="0"
+                              class="w-full pl-6 pr-2.5 py-1.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:border-indigo-500"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            @click="targetModalData.bulkTargets[seller.id] = Math.round((cleanNumber(seller.target) || 300000) / 30)"
+                            class="px-2 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded text-[10px] font-bold cursor-pointer"
+                            title="Set to 1/30th of monthly target"
+                          >
+                            ÷30
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Footer Actions -->
+                  <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      @click="closeModal"
+                      class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-all text-xs cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      @click="saveAllDailyTargets()"
+                      class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-xs transition-all shadow-sm shadow-indigo-600/20 cursor-pointer"
+                    >
+                      Save Daily Targets
+                    </button>
                   </div>
                 </div>
               </div>
