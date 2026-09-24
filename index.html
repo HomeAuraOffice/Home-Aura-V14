@@ -5779,6 +5779,92 @@
                         </div>
                       </div>
 
+                      <!-- ORDER DATE & REGISTRATION TIME SELECTOR (BACKDATE / PREVIOUS ORDERS) -->
+                      <div class="bg-indigo-50/40 dark:bg-slate-800/80 border border-indigo-100 dark:border-slate-700/80 rounded-2xl p-3.5 space-y-2.5">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                          <div class="flex items-center gap-2">
+                            <span class="p-1.5 rounded-lg bg-indigo-600 text-white shadow-xs">
+                              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                              </svg>
+                            </span>
+                            <div>
+                              <label class="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                                Order Date & Registration Time (BST, UTC+6) *
+                              </label>
+                              <p class="text-[10px] text-slate-500 dark:text-slate-400">
+                                Set previous date to backdate or log previous orders accurately
+                              </p>
+                            </div>
+                          </div>
+
+                          <!-- Quick 1-Click Preset Buttons -->
+                          <div class="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              @click="setIntakeOrderDatePreset('today')"
+                              :class="intakeForm.orderDate === getTodayBstDateString() ? 'bg-indigo-600 text-white font-bold shadow-xs' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600'"
+                              class="px-2.5 py-1 rounded-lg text-[10px] transition-all cursor-pointer flex items-center gap-1"
+                            >
+                              <span>⚡ Today</span>
+                            </button>
+                            <button
+                              type="button"
+                              @click="setIntakeOrderDatePreset('yesterday')"
+                              :class="intakeForm.orderDate === getYesterdayBstDateString() ? 'bg-amber-600 text-white font-bold shadow-xs' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600'"
+                              class="px-2.5 py-1 rounded-lg text-[10px] transition-all cursor-pointer flex items-center gap-1"
+                            >
+                              <span>📅 Yesterday</span>
+                            </button>
+                            <button
+                              type="button"
+                              @click="setIntakeOrderDatePreset('2days')"
+                              :class="intakeForm.orderDate === getDaysAgoBstDateString(2) ? 'bg-amber-600 text-white font-bold shadow-xs' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-600'"
+                              class="px-2.5 py-1 rounded-lg text-[10px] transition-all cursor-pointer flex items-center gap-1"
+                            >
+                              <span>⏮️ 2 Days Ago</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <!-- Date & Time Inputs with Status Pill -->
+                        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                          <div class="sm:col-span-5">
+                            <input
+                              type="date"
+                              v-model="intakeForm.orderDate"
+                              required
+                              :max="getTodayBstDateString()"
+                              class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-xs"
+                            />
+                          </div>
+                          <div class="sm:col-span-3">
+                            <input
+                              type="time"
+                              v-model="intakeForm.orderTime"
+                              class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 shadow-xs"
+                              title="Order Time (BST)"
+                            />
+                          </div>
+                          <div class="sm:col-span-4 flex items-center">
+                            <div
+                              v-if="intakeForm.orderDate && intakeForm.orderDate !== getTodayBstDateString()"
+                              class="w-full py-1.5 px-2.5 rounded-xl bg-amber-500/10 border border-amber-300 dark:border-amber-700/60 text-amber-800 dark:text-amber-300 text-[10px] font-bold flex items-center gap-1.5"
+                            >
+                              <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
+                              <span class="truncate">⏳ Previous Order: {{ formatDisplayDateOnly(intakeForm.orderDate) }}</span>
+                            </div>
+                            <div
+                              v-else
+                              class="w-full py-1.5 px-2.5 rounded-xl bg-emerald-500/10 border border-emerald-300 dark:border-emerald-700/60 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold flex items-center gap-1.5"
+                            >
+                              <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                              <span>🟢 Today's Live Order</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
                       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <!-- Traffic Source -->
                         <div>
@@ -6447,9 +6533,16 @@
                               >
                             </div>
                             <div
-                              class="text-[10px] text-slate-400 dark:text-slate-500 font-normal"
+                              class="text-[10px] text-slate-400 dark:text-slate-500 font-normal flex items-center gap-1 flex-wrap"
                             >
-                              {{ formatBangladeshDisplayTime(ord.timestamp) }}
+                              <span>{{ formatBangladeshDisplayTime(ord.timestamp) }}</span>
+                              <span
+                                v-if="ord.isBackdated || (ord.orderDate && ord.orderDate !== getTodayBstDateString())"
+                                class="px-1 py-0.2 rounded text-[8px] font-bold bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300"
+                                title="Previous/Backdated Order"
+                              >
+                                Past Date
+                              </span>
                             </div>
                             <div
                               v-if="ord.factoryTag"
@@ -8323,6 +8416,49 @@
                       rows="2"
                       class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 rounded-xl text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                     ></textarea>
+                  </div>
+
+                  <!-- Order Registration Date & Time Modifier -->
+                  <div class="bg-indigo-50/40 dark:bg-slate-800/60 p-3 rounded-xl border border-indigo-100 dark:border-slate-700/60 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Order Registration Date (BST)
+                      </label>
+                      <div class="flex items-center gap-1">
+                        <button
+                          type="button"
+                          @click="setEditOrderDatePreset('today')"
+                          :class="modalData.order.orderDate === getTodayBstDateString() ? 'bg-indigo-600 text-white font-bold' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'"
+                          class="px-2 py-0.5 rounded text-[10px] border border-slate-200 dark:border-slate-600 cursor-pointer"
+                        >Today</button>
+                        <button
+                          type="button"
+                          @click="setEditOrderDatePreset('yesterday')"
+                          :class="modalData.order.orderDate === getYesterdayBstDateString() ? 'bg-amber-600 text-white font-bold' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'"
+                          class="px-2 py-0.5 rounded text-[10px] border border-slate-200 dark:border-slate-600 cursor-pointer"
+                        >Yesterday</button>
+                        <button
+                          type="button"
+                          @click="setEditOrderDatePreset('2days')"
+                          :class="modalData.order.orderDate === getDaysAgoBstDateString(2) ? 'bg-amber-600 text-white font-bold' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300'"
+                          class="px-2 py-0.5 rounded text-[10px] border border-slate-200 dark:border-slate-600 cursor-pointer"
+                        >2 Days Ago</button>
+                      </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="date"
+                        v-model="modalData.order.orderDate"
+                        :max="getTodayBstDateString()"
+                        class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2 rounded-xl font-mono font-bold text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      />
+                      <input
+                        type="time"
+                        v-model="modalData.order.orderTime"
+                        class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-2 rounded-xl font-mono text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                        title="Time in Bangladesh BST"
+                      />
+                    </div>
                   </div>
 
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -10294,6 +10430,15 @@
                         >৳{{ (orderSuccessData.order?.totalAmount ||
                         0).toLocaleString() }}</strong
                       >
+                    </div>
+                    <div class="flex justify-between pt-1 border-t border-slate-200/60 dark:border-slate-700/60">
+                      <span class="text-slate-500 dark:text-slate-400"
+                        >Order Date (BST):</span
+                      >
+                      <span class="font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                        <span>{{ formatBangladeshDisplayTime(orderSuccessData.order?.timestamp) }}</span>
+                        <span v-if="orderSuccessData.order?.isBackdated" class="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 font-extrabold">Backdated</span>
+                      </span>
                     </div>
                   </div>
 

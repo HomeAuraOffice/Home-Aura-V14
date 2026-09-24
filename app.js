@@ -245,6 +245,47 @@
           }
         };
 
+        const getTodayBstDateString = () => {
+          return getBstDateString(new Date());
+        };
+
+        const getYesterdayBstDateString = () => {
+          const d = new Date();
+          d.setDate(d.getDate() - 1);
+          return getBstDateString(d);
+        };
+
+        const getDaysAgoBstDateString = (days = 2) => {
+          const d = new Date();
+          d.setDate(d.getDate() - days);
+          return getBstDateString(d);
+        };
+
+        const formatDisplayDateOnly = (isoOrDate) => {
+          if (!isoOrDate) return 'N/A';
+          try {
+            const d = parseToDate(isoOrDate) || new Date(isoOrDate);
+            if (!d || isNaN(d.getTime())) return String(isoOrDate);
+            return d.toLocaleDateString('en-GB', {
+              timeZone: 'Asia/Dhaka',
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric'
+            });
+          } catch(e) {
+            return String(isoOrDate);
+          }
+        };
+
+        const getBstTimeString = (dateInput = new Date()) => {
+          const d = new Date(dateInput);
+          if (isNaN(d.getTime())) return '12:00';
+          const pad = (n) => String(n).padStart(2, '0');
+          const dhakaStr = d.toLocaleString('en-US', { timeZone: 'Asia/Dhaka', hour12: false });
+          const dhakaDate = new Date(dhakaStr);
+          return `${pad(dhakaDate.getHours())}:${pad(dhakaDate.getMinutes())}`;
+        };
+
         const getBangladeshClockString = () => {
           const now = new Date();
           return now.toLocaleString('en-GB', {
@@ -2488,6 +2529,9 @@
           urgent: false,
           notes: '',
           cnNumber: '',
+          orderDate: getTodayBstDateString(),
+          orderTime: getBstTimeString(),
+          isCustomDate: false,
           collagePhotoUrl: '',
           collagePhotoLocalUrl: '',
           collagePhotoFileName: '',
@@ -2497,6 +2541,34 @@
           extraDetails: '',
           factoryTag: ''
         });
+
+        const setIntakeOrderDatePreset = (preset) => {
+          if (preset === 'today') {
+            intakeForm.orderDate = getTodayBstDateString();
+            intakeForm.orderTime = getBstTimeString(new Date());
+            intakeForm.isCustomDate = false;
+          } else if (preset === 'yesterday') {
+            intakeForm.orderDate = getYesterdayBstDateString();
+            intakeForm.isCustomDate = true;
+          } else if (preset === '2days') {
+            intakeForm.orderDate = getDaysAgoBstDateString(2);
+            intakeForm.isCustomDate = true;
+          } else if (preset === '3days') {
+            intakeForm.orderDate = getDaysAgoBstDateString(3);
+            intakeForm.isCustomDate = true;
+          }
+        };
+
+        const setEditOrderDatePreset = (preset) => {
+          if (!modalData.order) return;
+          if (preset === 'today') {
+            modalData.order.orderDate = getTodayBstDateString();
+          } else if (preset === 'yesterday') {
+            modalData.order.orderDate = getYesterdayBstDateString();
+          } else if (preset === '2days') {
+            modalData.order.orderDate = getDaysAgoBstDateString(2);
+          }
+        };
 
         // Modals
         const activeModal = ref(null);
@@ -4702,10 +4774,32 @@
           missingFieldsHighlight.value = false;
           const nextOrderNum = nextUpcomingOrderNum.value;
           const newId = nextUpcomingOrderId.value;
-          const timestamp = getBstIsoString();
+
+          const pad = (n) => String(n).padStart(2, '0');
+          const todayBst = getTodayBstDateString();
+          const selectedOrderDate = intakeForm.orderDate || todayBst;
+          const isPreviousOrder = selectedOrderDate !== todayBst;
+
+          let orderTimestamp;
+          if (!isPreviousOrder && (!intakeForm.orderTime || intakeForm.orderTime === getBstTimeString(new Date()))) {
+            orderTimestamp = getBstIsoString();
+          } else {
+            const now = new Date();
+            const dhakaNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka', hour12: false }));
+            let hours = pad(dhakaNow.getHours());
+            let minutes = pad(dhakaNow.getMinutes());
+            let seconds = pad(dhakaNow.getSeconds());
+            if (intakeForm.orderTime && intakeForm.orderTime.includes(':')) {
+              const tParts = intakeForm.orderTime.split(':');
+              hours = pad(tParts[0] || '12');
+              minutes = pad(tParts[1] || '00');
+            }
+            orderTimestamp = `${selectedOrderDate}T${hours}:${minutes}:${seconds}+06:00`;
+          }
+
           const sellerUsername = currentUser.value ? currentUser.value?.username : 'seller';
           const autoCn = intakeForm.cnNumber || ("CN-" + nextOrderNum);
-          const dateStr = getBangladeshDateString(new Date());
+          const dateStr = selectedOrderDate || getBangladeshDateString(new Date());
           const autoFileName = intakeForm.collagePhotoFileName || `collage_attachments/${sellerUsername}_${autoCn.replace(/[^a-zA-Z0-9-]/g, '')}_${dateStr}.jpg`;
           
           const normalizedPhone = normalizeCustomerPhone(intakeForm.customerPhone) || intakeForm.customerPhone;
@@ -4716,7 +4810,10 @@
 
           const newOrder = {
             id: newId,
-            timestamp,
+            timestamp: orderTimestamp,
+            orderDate: selectedOrderDate,
+            createdAt: orderTimestamp,
+            isBackdated: isPreviousOrder,
             merchantId: currentUser.value.id,
             merchantName: currentUser.value.name,
             customerName: intakeForm.customerName,
@@ -4779,6 +4876,9 @@
           intakeForm.urgent = false;
           intakeForm.notes = '';
           intakeForm.cnNumber = '';
+          intakeForm.orderDate = getTodayBstDateString();
+          intakeForm.orderTime = getBstTimeString(new Date());
+          intakeForm.isCustomDate = false;
           intakeForm.collagePhotoUrl = '';
           intakeForm.collagePhotoLocalUrl = '';
           intakeForm.collagePhotoFileName = '';
@@ -4824,7 +4924,7 @@
 `;
           waText += `━━━━━━━━━━━━━━━━━━━━━
 `;
-          waText += `🕒 *Registered (BST):* ${formatBangladeshDisplayTime(new Date())}
+          waText += `📅 *Order Date (BST):* ${formatBangladeshDisplayTime(newOrder.timestamp)}${newOrder.isBackdated ? ' _(Previous Order Logged)_' : ''}
 `;
 
 
@@ -5937,8 +6037,19 @@ const executeBulkFactoryDispatch = async () => {
           const initialTotal = (order.totalAmount !== undefined && order.totalAmount !== null && !isNaN(Number(order.totalAmount))) ? Number(order.totalAmount) : 0;
           const initialSale = (order.saleAmount !== undefined && order.saleAmount !== null && !isNaN(Number(order.saleAmount))) ? Number(order.saleAmount) : Math.max(0, initialTotal - initialDelivery);
 
+          const existingOrderDate = getBstDateString(order.timestamp || order.createdAt || order.orderDate || new Date());
+          let existingOrderTime = '12:00';
+          if (order.timestamp && order.timestamp.includes('T')) {
+            try {
+              const tPart = order.timestamp.split('T')[1];
+              if (tPart) existingOrderTime = tPart.substring(0, 5);
+            } catch(e) {}
+          }
+
           modalData.order = reactive({
             ...order,
+            orderDate: existingOrderDate,
+            orderTime: existingOrderTime,
             saleAmount: initialSale,
             deliveryCharge: initialDelivery,
             totalAmount: initialTotal > 0 ? initialTotal : (initialSale + initialDelivery)
@@ -5982,6 +6093,33 @@ const executeBulkFactoryDispatch = async () => {
                 return;
               }
             }
+
+            if (modalData.order.orderDate) {
+              const pad = (n) => String(n).padStart(2, '0');
+              let hours = '12';
+              let minutes = '00';
+              let seconds = '00';
+
+              if (modalData.order.orderTime && modalData.order.orderTime.includes(':')) {
+                const tParts = modalData.order.orderTime.split(':');
+                hours = pad(tParts[0] || '12');
+                minutes = pad(tParts[1] || '00');
+              } else if (modalData.order.timestamp && modalData.order.timestamp.includes('T')) {
+                const tPart = modalData.order.timestamp.split('T')[1];
+                if (tPart) {
+                  const parts = tPart.substring(0, 8).split(':');
+                  hours = pad(parts[0] || '12');
+                  minutes = pad(parts[1] || '00');
+                  seconds = pad(parts[2] || '00');
+                }
+              }
+
+              const updatedIso = `${modalData.order.orderDate}T${hours}:${minutes}:${seconds}+06:00`;
+              modalData.order.timestamp = updatedIso;
+              modalData.order.createdAt = updatedIso;
+              modalData.order.isBackdated = modalData.order.orderDate !== getTodayBstDateString();
+            }
+
             const del = Number(modalData.order.deliveryCharge) || 0;
             const sale = Number(modalData.order.saleAmount) || Math.max(0, (Number(modalData.order.totalAmount) || 0) - del);
             const total = sale + del;
@@ -7492,6 +7630,13 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           formatBangladeshDisplayTime,
           getBstIsoString,
           getBstDateString,
+          getTodayBstDateString,
+          getYesterdayBstDateString,
+          getDaysAgoBstDateString,
+          formatDisplayDateOnly,
+          getBstTimeString,
+          setIntakeOrderDatePreset,
+          setEditOrderDatePreset,
           getBangladeshDate,
           getBangladeshTimeString,
           getBangladeshTimestamp,
