@@ -73,6 +73,7 @@
           'Courier Booking',
           'Factory Submit',
           'Courier Pending',
+          'On Hold',
           'Delivered',
           'Partial Delivered',
           'Cancelled',
@@ -1583,6 +1584,10 @@
               };
             }
 
+            if (data && (data.lastUpdate || data.serverTimestamp)) {
+              localStorage.setItem('homeaura_server_sync_timestamp', data.lastUpdate || data.serverTimestamp);
+            }
+
             saveSyncQueue();
             lastSyncTimestamp.value = getBangladeshClockString();
             localStorage.setItem('homeaura_last_sync_time', lastSyncTimestamp.value);
@@ -1617,7 +1622,13 @@
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(new Error('Request timed out')), 45000);
 
-            const res = await fetch(url, {
+            let fetchUrl = url;
+            const serverSyncTime = localStorage.getItem('homeaura_server_sync_timestamp');
+            if (!isUserTriggered && serverSyncTime && orders.value.length > 0) {
+              fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + 'since=' + encodeURIComponent(serverSyncTime);
+            }
+
+            const res = await fetch(fetchUrl, {
               method: 'GET',
               signal: controller.signal
             });
@@ -1630,6 +1641,99 @@
             const data = await res.json();
             if (!data || data.status === 'error') {
               throw new Error(data?.error || 'Failed to fetch sheet data');
+            }
+
+            // --- 0A. INSTANT FAST-PATH: NO DATA MODIFIED ON SERVER ---
+            if (data.status === 'not_modified') {
+              lastPullTimestamp.value = getBangladeshClockString();
+              syncStatus.value = 'synced';
+              return;
+            }
+
+            // --- 0B. LIVE INSTANT DELTA: SURGICALLY UPDATE ONLY MODIFIED CELLS/ROWS ---
+            if (data.status === 'delta' && data.changes) {
+              let deltaUpdatedCount = 0;
+
+              // 1. Orders live delta
+              if (Array.isArray(data.changes.orders) && data.changes.orders.length > 0) {
+                data.changes.orders.forEach(remoteOrd => {
+                  if (!remoteOrd || !remoteOrd.id) return;
+                  const rId = String(remoteOrd.id);
+                  const localOrd = orders.value.find(o => String(o.id) === rId);
+                  if (localOrd) {
+                    const hasLocalPending = syncQueue.value.changes.orders && syncQueue.value.changes.orders[localOrd.id];
+                    if (!hasLocalPending) {
+                      const prevStatus = localOrd.status;
+                      const preservedLocalFactoryTag = localOrd.factoryTag || '';
+                      Object.assign(localOrd, remoteOrd);
+                      if (!localOrd.factoryTag && preservedLocalFactoryTag) {
+                        localOrd.factoryTag = preservedLocalFactoryTag;
+                      }
+                      if (prevStatus !== remoteOrd.status) deltaUpdatedCount++;
+                    }
+                  } else {
+                    const wasDeletedLocally = deletedOrders.value.some(d => String(d.id) === rId) ||
+                      (syncQueue.value.deletes.orders && syncQueue.value.deletes.orders.map(String).includes(rId));
+                    if (!wasDeletedLocally) {
+                      orders.value.unshift(remoteOrd);
+                      deltaUpdatedCount++;
+                    }
+                  }
+                });
+                localStorage.setItem('homeaura_orders', JSON.stringify(orders.value));
+              }
+
+              // 2. Orders deletes delta
+              if (data.deletes && Array.isArray(data.deletes.orders) && data.deletes.orders.length > 0) {
+                const delSet = new Set(data.deletes.orders.map(String));
+                orders.value = orders.value.filter(o => !delSet.has(String(o.id)));
+                localStorage.setItem('homeaura_orders', JSON.stringify(orders.value));
+              }
+
+              // 3. Tasks live delta
+              if (Array.isArray(data.changes.tasks) && data.changes.tasks.length > 0) {
+                data.changes.tasks.forEach(remoteT => {
+                  if (!remoteT || !remoteT.id) return;
+                  const localT = tasks.value.find(t => String(t.id) === String(remoteT.id));
+                  if (localT) {
+                    if (!syncQueue.value.changes.tasks || !syncQueue.value.changes.tasks[localT.id]) {
+                      Object.assign(localT, remoteT);
+                    }
+                  } else {
+                    tasks.value.unshift(remoteT);
+                  }
+                });
+                localStorage.setItem('homeaura_tasks', JSON.stringify(tasks.value));
+              }
+
+              // 4. Users live delta
+              if (Array.isArray(data.changes.users) && data.changes.users.length > 0) {
+                data.changes.users.forEach(remoteU => {
+                  if (!remoteU || !remoteU.username) return;
+                  const localU = users.value.find(u => String(u.username) === String(remoteU.username));
+                  if (localU) Object.assign(localU, remoteU);
+                  else users.value.push(remoteU);
+                });
+                localStorage.setItem('homeaura_users', JSON.stringify(users.value));
+              }
+
+              // 5. Factories live delta
+              if (Array.isArray(data.changes.factories) && data.changes.factories.length > 0) {
+                data.changes.factories.forEach(remoteF => {
+                  if (!remoteF || !remoteF.id) return;
+                  const localF = factories.value.find(f => String(f.id) === String(remoteF.id));
+                  if (localF) Object.assign(localF, remoteF);
+                  else factories.value.push(remoteF);
+                });
+                localStorage.setItem('homeaura_factories', JSON.stringify(factories.value));
+              }
+
+              if (data.lastUpdate) {
+                localStorage.setItem('homeaura_server_sync_timestamp', data.lastUpdate);
+              }
+              lastPullTimestamp.value = getBangladeshClockString();
+              syncStatus.value = 'synced';
+              return;
             }
 
             let updatedCount = 0;
@@ -1661,11 +1765,25 @@
                     if (remTime >= locTime || !localOrd.updatedAt) {
                       const prevStatus = localOrd.status;
                       const preservedLocalFactoryTag = localOrd.factoryTag || '';
+                      const preservedManualDelivered = localOrd.manualDeliveredOverride;
+                      const preservedManualCancelled = localOrd.manualCancelledOverride;
+                      const preservedManualHold = localOrd.manualHoldOverride;
+                      const preservedManualStatus = localOrd.manualStatusOverride;
+                      const preservedDeliveredAt = localOrd.deliveredAt;
+                      const preservedCancelledAt = localOrd.cancelledAt;
+                      const preservedPrevStatus = localOrd.previousStatus;
                       Object.assign(localOrd, remoteOrd);
                       // Preserve existing factory tag if remote was missing or blank
                       if (!localOrd.factoryTag && preservedLocalFactoryTag) {
                         localOrd.factoryTag = preservedLocalFactoryTag;
                       }
+                      if (preservedManualDelivered !== undefined) localOrd.manualDeliveredOverride = preservedManualDelivered;
+                      if (preservedManualCancelled !== undefined) localOrd.manualCancelledOverride = preservedManualCancelled;
+                      if (preservedManualHold !== undefined) localOrd.manualHoldOverride = preservedManualHold;
+                      if (preservedManualStatus !== undefined) localOrd.manualStatusOverride = preservedManualStatus;
+                      if (preservedDeliveredAt !== undefined && !remoteOrd.deliveredAt) localOrd.deliveredAt = preservedDeliveredAt;
+                      if (preservedCancelledAt !== undefined && !remoteOrd.cancelledAt) localOrd.cancelledAt = preservedCancelledAt;
+                      if (preservedPrevStatus && !localOrd.previousStatus) localOrd.previousStatus = preservedPrevStatus;
                       if (prevStatus !== remoteOrd.status) updatedCount++;
                     }
                   } else {
@@ -2001,6 +2119,12 @@
                   applyFavicon(customFavicon.value);
                 }
               }
+            }
+
+            if (data.lastUpdate) {
+              localStorage.setItem('homeaura_server_sync_timestamp', data.lastUpdate);
+            } else if (data.serverTimestamp) {
+              localStorage.setItem('homeaura_server_sync_timestamp', data.serverTimestamp);
             }
 
             lastPullTimestamp.value = getBangladeshClockString();
@@ -2861,12 +2985,19 @@
               signal: controller.signal
             });
             clearTimeout(timeoutId);
-            const result = await res.json();
-            if (result.status === 'success' && result.url) {
+            const rawText = await res.text();
+            let result = null;
+            try {
+              result = JSON.parse(rawText);
+            } catch (parseErr) {
+              console.warn('Apps Script returned non-JSON response during composite image upload:', rawText ? rawText.slice(0, 150) : 'empty');
+              return null;
+            }
+            if (result && result.status === 'success' && result.url) {
               return result.url;
             }
           } catch(e) {
-            console.error('Failed to upload composite PNG to drive:', e);
+            console.warn('Failed to upload composite image to drive:', e.message || e);
           }
           return null;
         };
@@ -2941,13 +3072,9 @@
           }
         };
 
-        // --- SELLER ONE-WAY STATUS ALLOWED PIPELINE ---
+        // --- SELLER STATUS ALLOWED PIPELINE ---
         const getAllowedStatusesForUser = (currentStatus) => {
-          if (!currentUser.value) return pipelineStages;
-          if (currentUser.value.role === 'admin') return pipelineStages;
-          const currIdx = pipelineStages.indexOf(currentStatus);
-          if (currIdx === -1) return pipelineStages;
-          return pipelineStages.slice(currIdx);
+          return allOrderStatuses;
         };
 
         const advanceSellerStatus = (order) => {
@@ -2980,13 +3107,40 @@
           }, 4000);
         };
 
+        // --- PERMISSION & ROLE MODIFICATION HELPER ---
+        const canUserModifyOrder = (order) => {
+          if (!order) return false;
+          if (!currentUser.value) return true;
+          const userRole = String(currentUser.value.role || '').toLowerCase();
+          if (userRole === 'admin' || userRole === 'moderator') return true;
+          
+          if (userRole === 'seller') {
+            const cId = String(currentUser.value.id ?? '').trim();
+            const cName = String(currentUser.value.name ?? '').trim().toLowerCase();
+            const cUser = String(currentUser.value.username ?? '').trim().toLowerCase();
+
+            const mId = String(order.merchantId ?? '').trim();
+            const mName = String(order.merchantName ?? '').trim().toLowerCase();
+
+            // If order has no merchant assigned yet, allow seller to modify
+            if (!mId && !mName) return true;
+            if (cId && mId && cId === mId) return true;
+            if (cName && mName && (cName === mName || mName.includes(cName) || cName.includes(mName))) return true;
+            if (cUser && mName && (cUser === mName || mName.includes(cUser) || cUser.includes(mName))) return true;
+            return false;
+          }
+          return true;
+        };
+
         // --- STATUS & DELIVERY HELPERS ---
         const isOrderDelivered = (o) => {
           if (!o) return false;
           if (o.status === 'Cancelled' || o.status === 'Void') return false;
+          if (o.manualCancelledOverride === true) return false;
+          if (o.manualDeliveredOverride === false) return false;
+          if (o.manualDeliveredOverride === true) return true;
           const st = String(o.status || '').trim().toLowerCase();
           if (st === 'delivered' || st === 'partial delivered') return true;
-          if (o.manualDeliveredOverride === false) return false;
           const sfcLive = (sfcDeliveryStatuses.value && o.id) ? sfcDeliveryStatuses.value[o.id]?.delivery_status : null;
           const sfc = String(sfcLive || o.sfcDeliveryStatus || '').trim().toLowerCase();
           return sfc === 'delivered' || sfc === 'partial_delivered';
@@ -2994,19 +3148,28 @@
 
         const isOrderCancelled = (o) => {
           if (!o) return false;
+          if (o.manualCancelledOverride === false) return false;
+          if (o.manualCancelledOverride === true) return true;
           const st = String(o.status || '').trim().toLowerCase();
           if (st === 'cancelled' || st === 'void') return true;
-          if (o.manualCancelledOverride === false) return false;
           const sfcLive = (sfcDeliveryStatuses.value && o.id) ? sfcDeliveryStatuses.value[o.id]?.delivery_status : null;
           const sfc = String(sfcLive || o.sfcDeliveryStatus || '').trim().toLowerCase();
           return sfc === 'cancelled';
+        };
+
+        const isOrderOnHold = (o) => {
+          if (!o) return false;
+          if (o.manualHoldOverride === false) return false;
+          if (o.manualHoldOverride === true) return true;
+          const st = String(o.status || '').trim().toLowerCase();
+          return st === 'on hold' || st === 'hold';
         };
 
         const isOrderPendingInFactory = (o, factoryName) => {
           if (!o || o.factoryTag !== factoryName) return false;
           const st = String(o.status || '').trim();
           // Terminal or post-factory statuses
-          if (['Delivered', 'Partial Delivered', 'Cancelled', 'Void', 'Returned Received', 'Returned from Customer', 'Courier Pending', 'Dispatched'].includes(st)) {
+          if (['Delivered', 'Partial Delivered', 'Cancelled', 'Void', 'Returned Received', 'Returned from Customer', 'Courier Pending', 'Dispatched', 'On Hold', 'Hold'].includes(st)) {
             return false;
           }
           // If SFC status indicates courier has accepted/picked up (pending, in_transit, delivered, etc.),
@@ -3015,6 +3178,44 @@
           if (sfc && sfc !== 'not_found' && sfc !== '') {
             return false;
           }
+          return true;
+        };
+
+        const isFactoryWarningActive = (order) => {
+          if (!order) return false;
+          // If factory is already assigned, warning is not needed
+          if (order.factoryTag && String(order.factoryTag).trim() !== '') return false;
+          
+          // Terminal, on hold, completed, or non-production statuses
+          if (isOrderCancelled(order) || isOrderDelivered(order) || isOrderOnHold(order)) return false;
+          
+          const st = String(order.status || '').trim();
+          if (['Cancelled', 'On Hold', 'Hold', 'Delivered', 'Partial Delivered', 'Returned from Customer', 'Returned Received', 'Void'].includes(st)) {
+            return false;
+          }
+          
+          // If manually overridden or status manually changed away from production
+          if (order.manualCancelledOverride === true || order.manualHoldOverride === true || order.manualDeliveredOverride === true) {
+            return false;
+          }
+
+          // If manually changed status and not in initial pipeline
+          if (order.manualStatusOverride === true && !['Confirmation Call', 'Courier Booking', 'Factory Submit'].includes(st)) {
+            return false;
+          }
+
+          // If order is not assigned to a seller/merchant or not going to seller
+          const sellerId = order.merchantId || order.sellerId;
+          if (!sellerId || sellerId === 'none' || sellerId === 'unassigned') {
+            return false;
+          }
+
+          // Only active production pipeline orders need factory partner assignment
+          const activeFactoryPipeline = ['Confirmation Call', 'Courier Booking', 'Factory Submit'];
+          if (!activeFactoryPipeline.includes(st)) {
+            return false;
+          }
+
           return true;
         };
 
@@ -4192,10 +4393,10 @@
               canvas.toBlob((blob) => {
                 resolve({
                   blob,
-                  dataUrl: canvas.toDataURL('image/png'),
+                  dataUrl: canvas.toDataURL('image/jpeg', 0.88),
                   itemsCount: (collageImg ? 1 : 0) + (proofImg ? 1 : 0)
                 });
-              }, 'image/png');
+              }, 'image/jpeg', 0.88);
             });
           }
 
@@ -4379,10 +4580,10 @@
             canvas.toBlob((blob) => {
               resolve({
                 blob,
-                dataUrl: canvas.toDataURL('image/png'),
+                dataUrl: canvas.toDataURL('image/jpeg', 0.88),
                 itemsCount: numItems
               });
-            }, 'image/png');
+            }, 'image/jpeg', 0.88);
           });
         };
 
@@ -4718,30 +4919,44 @@
         };
 
         const quickStatusChange = (order, newStatus) => {
-          if (currentUser.value?.role === 'seller' && order.merchantName !== currentUser.value?.name && order.merchantId !== currentUser.value?.id) {
+          if (!order) return;
+          const target = orders.value.find(o => o.id === order.id) || order;
+          if (!canUserModifyOrder(target)) {
             syncNotice.value = "⚠️ Security restriction: You cannot update status of orders assigned to other merchants.";
             setTimeout(() => { syncNotice.value = ''; }, 4000);
             return;
           }
-          const target = orders.value.find(o => o.id === order.id) || order;
           const oldStatus = target.status;
           target.previousStatus = oldStatus;
           target.status = newStatus;
+          target.manualStatusOverride = true;
           
           if (newStatus === 'Cancelled') {
             target.cancelledAt = getBstIsoString();
             target.sfcDeliveryStatus = 'cancelled';
             target.manualCancelledOverride = true;
+            target.manualDeliveredOverride = false;
+            target.manualHoldOverride = false;
+            target.deliveredAt = '';
           } else if (oldStatus === 'Cancelled') {
             target.cancelledAt = '';
             target.manualCancelledOverride = false;
             if (target.sfcDeliveryStatus === 'cancelled') target.sfcDeliveryStatus = 'pending';
           }
           
+          if (newStatus === 'On Hold' || newStatus === 'Hold') {
+            target.manualHoldOverride = true;
+          } else if (oldStatus === 'On Hold' || oldStatus === 'Hold') {
+            target.manualHoldOverride = false;
+          }
+
           if (newStatus === 'Delivered' || newStatus === 'Partial Delivered') {
             target.deliveredAt = target.deliveredAt || getBstIsoString();
             target.sfcDeliveryStatus = 'delivered';
             target.manualDeliveredOverride = true;
+            target.manualCancelledOverride = false;
+            target.manualHoldOverride = false;
+            target.cancelledAt = '';
           } else if (oldStatus === 'Delivered' || oldStatus === 'Partial Delivered') {
             target.deliveredAt = '';
             target.manualDeliveredOverride = false;
@@ -4756,13 +4971,15 @@
         };
 
         const toggleUrgent = (order) => {
-          if (currentUser.value?.role === 'seller' && order.merchantName !== currentUser.value?.name && order.merchantId !== currentUser.value?.id) {
+          if (!order) return;
+          const target = orders.value.find(o => o.id === order.id) || order;
+          if (!canUserModifyOrder(target)) {
             syncNotice.value = "⚠️ Security restriction: You cannot update orders assigned to other merchants.";
             setTimeout(() => { syncNotice.value = ''; }, 4000);
             return;
           }
-          order.urgent = !order.urgent;
-          order.updatedAt = getBstIsoString();
+          target.urgent = !target.urgent;
+          target.updatedAt = getBstIsoString();
           order.updatedBy = currentUser.value?.username || 'seller';
           queueChange('orders', order);
           saveOrdersLocally();
@@ -5376,6 +5593,8 @@ const executeBulkFactoryDispatch = async () => {
             case 'Returned from Customer': return 'bg-rose-50 text-rose-700 border-rose-200';
             case 'Returned Received': return 'bg-slate-100 text-slate-700 border-slate-300';
             case 'Cancelled': return 'bg-rose-100 text-rose-800 border-rose-300 font-bold';
+            case 'On Hold':
+            case 'Hold': return 'bg-amber-100 text-amber-800 border-amber-300 font-bold';
             default: return 'bg-slate-50 text-slate-700 border-slate-200';
           }
         };
@@ -5495,18 +5714,22 @@ const executeBulkFactoryDispatch = async () => {
                   orderChanged = true;
                 }
                 if (data.delivery_status === 'delivered') {
-                  if (order.status !== 'Delivered') {
-                    order.status = 'Delivered';
-                    orderChanged = true;
-                  }
-                  if (!order.deliveredAt) {
-                    order.deliveredAt = getBstIsoString();
-                    orderChanged = true;
+                  if (order.manualDeliveredOverride !== false && !isOrderCancelled(order)) {
+                    if (order.status !== 'Delivered') {
+                      order.status = 'Delivered';
+                      orderChanged = true;
+                    }
+                    if (!order.deliveredAt) {
+                      order.deliveredAt = getBstIsoString();
+                      orderChanged = true;
+                    }
                   }
                 } else if (data.delivery_status === 'cancelled') {
-                  if (order.status !== 'Cancelled') {
-                    order.status = 'Cancelled';
-                    orderChanged = true;
+                  if (order.manualCancelledOverride !== false) {
+                    if (order.status !== 'Cancelled') {
+                      order.status = 'Cancelled';
+                      orderChanged = true;
+                    }
                   }
                 }
               }
@@ -5753,7 +5976,7 @@ const executeBulkFactoryDispatch = async () => {
               const newStatus = modalData.order.status;
               const oldIdx = pipelineStages.indexOf(oldStatus);
               const newIdx = pipelineStages.indexOf(newStatus);
-              if (newIdx < oldIdx) {
+              if (newIdx < oldIdx && newStatus !== 'Cancelled' && oldStatus !== 'Delivered' && oldStatus !== 'Partial Delivered') {
                 alert('⚠️ Sellers can only update order status in one way (forward pipeline stages). Backwards status updates are restricted to Admins.');
                 modalData.order.status = oldStatus;
                 return;
@@ -5766,20 +5989,36 @@ const executeBulkFactoryDispatch = async () => {
             modalData.order.saleAmount = sale;
             modalData.order.totalAmount = total;
 
+            if (modalData.order.status !== orders.value[idx].status) {
+              modalData.order.manualStatusOverride = true;
+            }
+
             if (modalData.order.status === 'Cancelled') {
               modalData.order.cancelledAt = modalData.order.cancelledAt || getBstIsoString();
               modalData.order.sfcDeliveryStatus = 'cancelled';
               modalData.order.manualCancelledOverride = true;
+              modalData.order.manualDeliveredOverride = false;
+              modalData.order.manualHoldOverride = false;
+              modalData.order.deliveredAt = '';
             } else if (orders.value[idx].status === 'Cancelled') {
               modalData.order.cancelledAt = '';
               modalData.order.manualCancelledOverride = false;
               if (modalData.order.sfcDeliveryStatus === 'cancelled') modalData.order.sfcDeliveryStatus = 'pending';
             }
 
+            if (modalData.order.status === 'On Hold' || modalData.order.status === 'Hold') {
+              modalData.order.manualHoldOverride = true;
+            } else if (orders.value[idx].status === 'On Hold' || orders.value[idx].status === 'Hold') {
+              modalData.order.manualHoldOverride = false;
+            }
+
             if (modalData.order.status === 'Delivered' || modalData.order.status === 'Partial Delivered') {
               modalData.order.deliveredAt = modalData.order.deliveredAt || getBstIsoString();
               modalData.order.sfcDeliveryStatus = 'delivered';
               modalData.order.manualDeliveredOverride = true;
+              modalData.order.manualCancelledOverride = false;
+              modalData.order.manualHoldOverride = false;
+              modalData.order.cancelledAt = '';
             } else if (orders.value[idx].status === 'Delivered' || orders.value[idx].status === 'Partial Delivered') {
               modalData.order.deliveredAt = '';
               modalData.order.manualDeliveredOverride = false;
@@ -5808,17 +6047,18 @@ const executeBulkFactoryDispatch = async () => {
         const cancelOrder = (order) => {
           if (!order) return;
           const target = orders.value.find(o => o.id === order.id) || order;
-          if (currentUser.value?.role === 'seller' && target.merchantName !== currentUser.value?.name && target.merchantId !== currentUser.value?.id) {
+          if (!canUserModifyOrder(target)) {
             syncNotice.value = "⚠️ Security restriction: You cannot cancel orders assigned to other merchants.";
             setTimeout(() => { syncNotice.value = ''; }, 4000);
             return;
           }
           
-          if (target.status === 'Cancelled') {
+          if (target.status === 'Cancelled' || target.manualCancelledOverride === true) {
             // Reactivate cancelled order
-            const reactivatedStatus = (target.previousStatus && target.previousStatus !== 'Cancelled')
-              ? target.previousStatus
-              : 'Confirmation Call';
+            let reactivatedStatus = target.previousStatus;
+            if (!reactivatedStatus || reactivatedStatus === 'Cancelled') {
+              reactivatedStatus = target.cnNumber ? 'Courier Pending' : 'In Production';
+            }
             target.status = reactivatedStatus;
             target.cancelledAt = '';
             target.manualCancelledOverride = false;
@@ -5839,11 +6079,13 @@ const executeBulkFactoryDispatch = async () => {
           }
 
           // Mark order as Cancelled
-          target.previousStatus = (target.status !== 'Cancelled') ? target.status : 'Confirmation Call';
-          target.previousSfcStatus = (target.sfcDeliveryStatus !== 'cancelled') ? target.sfcDeliveryStatus : 'pending';
+          target.previousStatus = (target.status && target.status !== 'Cancelled') ? target.status : (target.cnNumber ? 'Courier Pending' : 'In Production');
+          target.previousSfcStatus = (target.sfcDeliveryStatus && target.sfcDeliveryStatus !== 'cancelled') ? target.sfcDeliveryStatus : 'pending';
           target.status = 'Cancelled';
           target.sfcDeliveryStatus = 'cancelled';
           target.manualCancelledOverride = true;
+          target.manualDeliveredOverride = false;
+          target.deliveredAt = '';
           target.cancelledAt = getBstIsoString();
           target.updatedAt = getBstIsoString();
           target.updatedBy = currentUser.value?.username || 'admin';
@@ -5861,7 +6103,7 @@ const executeBulkFactoryDispatch = async () => {
         const toggleOrderDelivered = (order) => {
           if (!order) return;
           const target = orders.value.find(o => o.id === order.id) || order;
-          if (currentUser.value?.role === 'seller' && target.merchantName !== currentUser.value?.name && target.merchantId !== currentUser.value?.id) {
+          if (!canUserModifyOrder(target)) {
             syncNotice.value = "⚠️ Security restriction: You cannot update delivery status for orders assigned to other merchants.";
             setTimeout(() => { syncNotice.value = ''; }, 4000);
             return;
@@ -5869,9 +6111,10 @@ const executeBulkFactoryDispatch = async () => {
           
           if (isOrderDelivered(target)) {
             // Revert / Undo Delivered status
-            const revertedStatus = (target.previousStatus && target.previousStatus !== 'Delivered' && target.previousStatus !== 'Partial Delivered')
-              ? target.previousStatus
-              : 'Courier Pending';
+            let revertedStatus = target.previousStatus;
+            if (!revertedStatus || revertedStatus === 'Delivered' || revertedStatus === 'Partial Delivered' || revertedStatus === 'Cancelled') {
+              revertedStatus = target.cnNumber ? 'Courier Pending' : 'In Production';
+            }
             target.status = revertedStatus;
             target.sfcDeliveryStatus = (target.previousSfcStatus && target.previousSfcStatus !== 'delivered')
               ? target.previousSfcStatus
@@ -5892,11 +6135,13 @@ const executeBulkFactoryDispatch = async () => {
           }
 
           // Mark as Delivered
-          target.previousStatus = (target.status !== 'Delivered' && target.status !== 'Partial Delivered') ? target.status : (target.previousStatus || 'Courier Pending');
+          target.previousStatus = (target.status !== 'Delivered' && target.status !== 'Partial Delivered' && target.status !== 'Cancelled') ? target.status : (target.previousStatus || (target.cnNumber ? 'Courier Pending' : 'In Production'));
           target.previousSfcStatus = (target.sfcDeliveryStatus !== 'delivered') ? target.sfcDeliveryStatus : (target.previousSfcStatus || 'pending');
           target.status = 'Delivered';
           target.sfcDeliveryStatus = 'delivered';
           target.manualDeliveredOverride = true;
+          target.manualCancelledOverride = false;
+          target.cancelledAt = '';
           target.deliveredAt = getBstIsoString();
           if (sfcDeliveryStatuses.value && target.id) {
             if (!sfcDeliveryStatuses.value[target.id]) sfcDeliveryStatuses.value[target.id] = {};
@@ -5911,8 +6156,50 @@ const executeBulkFactoryDispatch = async () => {
           setTimeout(() => { if (syncNotice.value?.includes(target.id)) syncNotice.value = ''; }, 4000);
         };
 
+        const toggleOrderHold = (order) => {
+          if (!order) return;
+          const target = orders.value.find(o => o.id === order.id) || order;
+          if (!canUserModifyOrder(target)) {
+            syncNotice.value = "⚠️ Security restriction: You cannot update status for orders assigned to other merchants.";
+            setTimeout(() => { syncNotice.value = ''; }, 4000);
+            return;
+          }
+
+          if (isOrderOnHold(target)) {
+            // Resume / Unhold order
+            let resumedStatus = target.previousStatus;
+            if (!resumedStatus || isOrderOnHold({ status: resumedStatus }) || resumedStatus === 'Cancelled') {
+              resumedStatus = target.cnNumber ? 'Courier Pending' : 'In Production';
+            }
+            target.status = resumedStatus;
+            target.manualHoldOverride = false;
+            target.updatedAt = getBstIsoString();
+            target.updatedBy = currentUser.value?.username || 'admin';
+            queueChange('orders', target);
+            saveOrdersLocally();
+            triggerAutoSync(true);
+            syncNotice.value = `▶️ Order #${target.id} resumed from Hold (restored to "${resumedStatus}").`;
+            setTimeout(() => { if (syncNotice.value?.includes(target.id)) syncNotice.value = ''; }, 4000);
+            return;
+          }
+
+          // Put on Hold
+          target.previousStatus = (!isOrderOnHold(target) && target.status !== 'Cancelled')
+            ? target.status
+            : (target.previousStatus || (target.cnNumber ? 'Courier Pending' : 'In Production'));
+          target.status = 'On Hold';
+          target.manualHoldOverride = true;
+          target.updatedAt = getBstIsoString();
+          target.updatedBy = currentUser.value?.username || 'admin';
+          queueChange('orders', target);
+          saveOrdersLocally();
+          triggerAutoSync(true);
+          syncNotice.value = `⏸️ Order #${target.id} placed on Hold. (Click hold button again anytime to resume)`;
+          setTimeout(() => { if (syncNotice.value?.includes(target.id)) syncNotice.value = ''; }, 4000);
+        };
+
         const confirmVoidOrder = (order) => {
-          if (currentUser.value?.role === 'seller' && order.merchantName !== currentUser.value?.name && order.merchantId !== currentUser.value?.id) {
+          if (!canUserModifyOrder(order)) {
             alert("⚠️ Security restriction: You cannot void orders assigned to other merchants.");
             return;
           }
@@ -7054,12 +7341,19 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
             });
           }
 
-          // Dynamic polling (12s when visible, 60s when hidden)
+          // Live Adaptive Polling: 4s when active (lightweight delta check), 25s when idle
+          let lastUserActivityTime = Date.now();
+          const recordUserInteraction = () => { lastUserActivityTime = Date.now(); };
+          window.addEventListener('mousemove', recordUserInteraction, { passive: true });
+          window.addEventListener('keydown', recordUserInteraction, { passive: true });
+          window.addEventListener('click', recordUserInteraction, { passive: true });
+
           let pollInterval = setInterval(() => {
-            if (appsScriptUrl.value && !document.hidden && navigator.onLine) {
-              syncFromGoogleSheets().finally(() => { isInitialLoad.value = false; });
-            }
-          }, 12000);
+            if (!appsScriptUrl.value || document.hidden || !navigator.onLine) return;
+            const isIdle = (Date.now() - lastUserActivityTime) > 90000; // 90s idle
+            if (isIdle && (Date.now() % 24000 > 4500)) return; // reduce frequency when idle
+            syncFromGoogleSheets().finally(() => { isInitialLoad.value = false; });
+          }, 4000);
 
           // Visibility change listener
           document.addEventListener('visibilitychange', () => {
@@ -7428,9 +7722,13 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           fetchFraudCheckForOrders,
           allOrderStatuses,
           isOrderDelivered,
+          isOrderCancelled,
+          isOrderOnHold,
           isOrderPendingInFactory,
+          isFactoryWarningActive,
           cancelOrder,
           toggleOrderDelivered,
+          toggleOrderHold,
           customFavicon,
           faviconInputUrl,
           isFaviconSaving,

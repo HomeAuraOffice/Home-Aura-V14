@@ -1,37 +1,152 @@
 // ==============================================================================
-// HOMEAURA V4 - MULTI-USER SYNCHRONIZATION BACKEND (APPS SCRIPT)
+// HOMEAURA V5 - MULTI-USER INSTANT DELTA SYNCHRONIZATION BACKEND (APPS SCRIPT)
 // ==============================================================================
 
+var DELTA_CACHE_KEY = 'HOMEAURA_RECENT_DELTAS_V1';
+var LAST_UPDATE_KEY = 'HOMEAURA_LAST_UPDATE_V1';
+var FULL_SNAPSHOT_CACHE_KEY = 'HOMEAURA_FULL_SNAPSHOT_V1';
+
+/**
+ * Record modified items into in-memory rolling delta buffer
+ */
+function recordRecentChanges(changesMap, deletesMap, sender) {
+  var now = new Date().toISOString();
+  try {
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(LAST_UPDATE_KEY, now);
+
+    var cache = CacheService.getScriptCache();
+    cache.remove(FULL_SNAPSHOT_CACHE_KEY); // Invalidate snapshot cache on new write
+
+    var raw = cache.get(DELTA_CACHE_KEY);
+    var buffer = [];
+    if (raw) {
+      try { buffer = JSON.parse(raw); } catch(e) { buffer = []; }
+    }
+
+    // Push new delta entry
+    buffer.push({
+      timestamp: now,
+      sender: sender || '',
+      changes: changesMap || {},
+      deletes: deletesMap || {}
+    });
+
+    // Keep up to 100 recent change events
+    if (buffer.length > 100) {
+      buffer = buffer.slice(buffer.length - 100);
+    }
+
+    cache.put(DELTA_CACHE_KEY, JSON.stringify(buffer), 21600); // 6 hours
+  } catch(e) {}
+  return now;
+}
+
 function doGet(e) {
-  var lock = LockService.getScriptLock();
-  try { 
-    lock.waitLock(15000); 
-  } catch(err) {
+  var clientSince = e && e.parameter && e.parameter.since ? String(e.parameter.since) : null;
+  var props = PropertiesService.getScriptProperties();
+  var lastUpdate = props.getProperty(LAST_UPDATE_KEY) || '0';
+
+  // 1. FAST-PATH: If client's cached timestamp is >= last mutation time, nothing has changed
+  if (clientSince && clientSince >= lastUpdate && lastUpdate !== '0') {
     return ContentService.createTextOutput(JSON.stringify({ 
-      status: 'busy', 
-      error: 'Server lock timeout' 
+      status: 'not_modified', 
+      lastUpdate: lastUpdate,
+      serverTimestamp: new Date().toISOString() 
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
+  // 2. DELTA-PATH: If client provided a valid timestamp, return ONLY modified records
+  if (clientSince) {
+    var cache = CacheService.getScriptCache();
+    var raw = cache.get(DELTA_CACHE_KEY);
+    if (raw) {
+      try {
+        var buffer = JSON.parse(raw);
+        var oldestInBuffer = buffer.length > 0 ? buffer[0].timestamp : null;
+        if (oldestInBuffer && oldestInBuffer <= clientSince) {
+          var relevant = buffer.filter(function(b) {
+            return b && b.timestamp && b.timestamp > clientSince;
+          });
+
+          if (relevant.length > 0) {
+            var mergedChanges = {};
+            var mergedDeletes = {};
+
+            relevant.forEach(function(entry) {
+              if (entry.changes) {
+                Object.keys(entry.changes).forEach(function(collection) {
+                  if (!mergedChanges[collection]) mergedChanges[collection] = {};
+                  var items = entry.changes[collection];
+                  if (Array.isArray(items)) {
+                    items.forEach(function(item) {
+                      if (item && item.id) {
+                        mergedChanges[collection][String(item.id)] = item;
+                      }
+                    });
+                  }
+                });
+              }
+              if (entry.deletes) {
+                Object.keys(entry.deletes).forEach(function(collection) {
+                  if (!mergedDeletes[collection]) mergedDeletes[collection] = [];
+                  var delIds = entry.deletes[collection];
+                  if (Array.isArray(delIds)) {
+                    delIds.forEach(function(id) {
+                      if (!mergedDeletes[collection].includes(id)) {
+                        mergedDeletes[collection].push(id);
+                      }
+                    });
+                  }
+                });
+              }
+            });
+
+            var finalChanges = {};
+            Object.keys(mergedChanges).forEach(function(col) {
+              finalChanges[col] = Object.values(mergedChanges[col]);
+            });
+
+            return ContentService.createTextOutput(JSON.stringify({
+              status: 'delta',
+              lastUpdate: lastUpdate,
+              serverTimestamp: new Date().toISOString(),
+              changes: finalChanges,
+              deletes: mergedDeletes
+            })).setMimeType(ContentService.MimeType.JSON);
+          }
+        }
+      } catch(err) {
+        // Fallback to full fetch if error parsing buffer
+      }
+    }
+  }
+
+  // 3. FULL SNAPSHOT PATH (First load, stale client, or forced refresh)
   try {
+    var cacheSnap = CacheService.getScriptCache();
+    var cachedSnapshot = cacheSnap.get(FULL_SNAPSHOT_CACHE_KEY);
+    if (cachedSnapshot) {
+      return ContentService.createTextOutput(cachedSnapshot)
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     var rawCategories = sheetToObjects("categories");
     var categories = rawCategories.map(function(c) {
-      if (typeof c === 'object' && c !== null) {
-        return c.name || Object.values(c).join('');
-      }
+      if (typeof c === 'object' && c !== null) return c.name || Object.values(c).join('');
       return String(c);
     });
     
     var rawFabrics = sheetToObjects("fabrics");
     var fabrics = rawFabrics.map(function(c) {
-      if (typeof c === 'object' && c !== null) {
-        return c.name || Object.values(c).join('');
-      }
+      if (typeof c === 'object' && c !== null) return c.name || Object.values(c).join('');
       return String(c);
     });
 
     var data = {
       status: 'success',
+      mode: 'full',
+      lastUpdate: lastUpdate,
       serverTimestamp: new Date().toISOString(),
       users: sheetToObjects("users"),
       orders: sheetToObjects("orders"),
@@ -45,15 +160,17 @@ function doGet(e) {
       tasks: sheetToObjects("tasks"),
       notifications: sheetToObjects("notifications")
     };
-    return ContentService.createTextOutput(JSON.stringify(data))
+
+    var jsonStr = JSON.stringify(data);
+    try { cacheSnap.put(FULL_SNAPSHOT_CACHE_KEY, jsonStr, 15); } catch(e) {}
+
+    return ContentService.createTextOutput(jsonStr)
       .setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({ 
       status: 'error', 
       error: err.toString() 
     })).setMimeType(ContentService.MimeType.JSON);
-  } finally {
-    try { lock.releaseLock(); } catch(e) {}
   }
 }
 
@@ -183,10 +300,13 @@ function doPost(e) {
         distributeOrdersBySeller();
       } catch(e) {}
 
+      var lastUpdateDelta = recordRecentChanges(changes, deletes, payloadObj.sender);
+
       return ContentService.createTextOutput(JSON.stringify({
         status: 'success',
         mode: 'delta',
         stats: stats,
+        lastUpdate: lastUpdateDelta,
         serverTimestamp: new Date().toISOString()
       })).setMimeType(ContentService.MimeType.JSON);
     }
@@ -231,10 +351,20 @@ function doPost(e) {
       distributeOrdersBySeller();
     } catch(e) {}
 
+    var lastUpdateFull = recordRecentChanges({
+      orders: payloadObj.orders,
+      users: payloadObj.users,
+      factories: payloadObj.factories,
+      tasks: payloadObj.tasks,
+      expenses: payloadObj.expenses,
+      settings: payloadObj.settings
+    }, payloadObj.pendingDeletes, payloadObj.sender);
+
     return ContentService.createTextOutput(JSON.stringify({
       status: 'success',
       mode: 'full',
       stats: stats,
+      lastUpdate: lastUpdateFull,
       serverTimestamp: new Date().toISOString()
     })).setMimeType(ContentService.MimeType.JSON);
 
