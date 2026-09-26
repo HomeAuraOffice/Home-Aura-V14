@@ -1,5 +1,37 @@
 <!doctype html>
+<!--
+================================================================================
+HOMEAURA ENTERPRISE ERP - MASTER TEMPLATE & VIEW ARCHITECTURE
+================================================================================
+DIAGNOSTIC VIEW SEGMENT INDEX (19 SEGMENTS):
+
+[HTML-SEGMENT 01]: DOCUMENT HEAD, META TAGS & EXTERNAL SCRIPTS
+[HTML-SEGMENT 02]: EMBEDDED STYLES, CYBERNETIC SCI-FI GLOW & TAILWIND UTILITIES
+[HTML-SEGMENT 03]: AUTHENTICATION SCREEN & LOGIN PORTAL
+[HTML-SEGMENT 04]: MAIN SHELL - DESKTOP NAVIGATION SIDEBAR
+[HTML-SEGMENT 05]: MAIN SHELL - MOBILE TOP BAR & RESPONSIVE DRAWER
+[HTML-SEGMENT 06]: GLOBAL NOTIFICATION BANNER & OUTBOX SYNC TELEMETRY
+[HTML-SEGMENT 07]: VIEW 01 - EXECUTIVE ANALYTICS DASHBOARD & KPI CARDS
+[HTML-SEGMENT 08]: VIEW 02 - MASTER ORDER LEDGER & CENTRAL OPERATIONS TABLE
+[HTML-SEGMENT 09]: VIEW 03 - PAYABLES AUDIT & FACTORY INVOICE RECONCILIATION
+[HTML-SEGMENT 10]: VIEW 04 - FINANCE LEDGER & OPERATIONAL EXPENSES
+[HTML-SEGMENT 11]: VIEW 05 - FACTORY NETWORK & PRIORITY WORKLOAD DISPATCH
+[HTML-SEGMENT 12]: VIEW 06 - TRASH & DELETED ORDERS AUDIT VAULT
+[HTML-SEGMENT 13]: VIEW 07 - SYSTEM SETTINGS, PROFILE MANAGEMENT & BACKUP
+[HTML-SEGMENT 14]: VIEW 08 - MARKETING SPEND TRACKER & CAMPAIGN ANALYTICS
+[HTML-SEGMENT 15]: VIEW 09 - SELLER WORKSPACE: SMART ORDER INTAKE & PARSER
+[HTML-SEGMENT 16]: VIEW 10 - SELLER WORKSPACE: MY ORDERS ENTRY ARCHIVE
+[HTML-SEGMENT 17]: VIEW 11 - TEAM TASKS, ROUTINES & 48-HOUR ORDER ESCALATION
+[HTML-SEGMENT 18]: GLOBAL MODAL SYSTEM (22 SPECIALIZED WORKFLOW DIALOGS)
+[HTML-SEGMENT 19]: GLOBAL SCRIPT ENTRYPOINT & VUE 3 APPLICATION MOUNT
+================================================================================
+-->
+
 <html lang="en">
+  <!-- =========================================================================
+     [HTML-SEGMENT 01/19]: DOCUMENT HEAD, META TAGS & EXTERNAL SCRIPTS
+     Dependencies: Tailwind CDN, Vue 3 CDN, Chart.js, CryptoJS, Google Fonts
+     ========================================================================= -->
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -19,6 +51,10 @@
     <!-- Tailwind CSS CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- =========================================================================
+     [HTML-SEGMENT 02/19]: EMBEDDED STYLES, CYBERNETIC SCI-FI GLOW & TAILWIND UTILITIES
+     Visual Systems: Sci-Fi Laser Conduits, Tactical Alert Rows, Custom Scrollbars
+     ========================================================================= -->
     <style>
       /* =========================================================
          SCI-FI CYBERNETIC KEYFRAMES & QUANTUM GLOW SYSTEM
@@ -601,7 +637,11 @@
     class="bg-slate-50 dark:bg-[#0b0f19] text-slate-900 dark:text-slate-100 antialiased selection:bg-indigo-100 selection:text-indigo-700 transition-colors duration-200"
   >
     <div id="app" v-cloak class="min-h-screen flex flex-col justify-between">
-      <!-- LOGIN SCREEN -->
+      <!-- =========================================================================
+     [HTML-SEGMENT 03/19]: AUTHENTICATION SCREEN & LOGIN PORTAL
+     Capabilities: Credentials authentication, role routing, Apps Script initial setup
+     ========================================================================= -->
+        <!-- LOGIN SCREEN -->
       <div
         v-if="!currentUser"
         class="min-h-screen flex items-center justify-center p-4 bg-slate-900 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-white relative overflow-hidden"
@@ -769,6 +809,10 @@
 
       <!-- MAIN AUTHENTICATED SYSTEM PORTAL -->
       <div v-else class="flex-1 flex flex-col md:flex-row relative">
+        <!-- =========================================================================
+     [HTML-SEGMENT 04/19]: MAIN SHELL - DESKTOP NAVIGATION SIDEBAR
+     Capabilities: Role-based navigation tabs, branding badge, dark mode toggle
+     ========================================================================= -->
         <!-- DESKTOP SIDEBAR -->
         <aside
           class="hidden md:flex flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-300 sticky top-0 h-screen overflow-y-auto"
@@ -1641,6 +1685,10 @@
 
           <!-- Main Body Container -->
           <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            <!-- =========================================================================
+     [HTML-SEGMENT 07/19]: VIEW 01 - EXECUTIVE ANALYTICS DASHBOARD & KPI CARDS
+     Capabilities: Sales goals, merchant progress bars, daily target tracking, Chart.js
+     ========================================================================= -->
             <!-- ==================== ADMIN: ANALYTICS DASHBOARD ==================== -->
             <transition name="pane-fade" mode="out-in">
               <div
@@ -3523,6 +3571,10 @@
               </div>
             </transition>
 
+            <!-- =========================================================================
+     [HTML-SEGMENT 08/19]: VIEW 02 - MASTER ORDER LEDGER & CENTRAL OPERATIONS TABLE
+     Capabilities: Real-time search, multi-filter, order actions, fraud check, bulk select
+     ========================================================================= -->
             <!-- ==================== ADMIN: MASTER ORDER LEDGER ==================== -->
             <transition name="pane-fade" mode="out-in">
               <div
@@ -3608,6 +3660,7 @@
                       class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                     >
                       <option value="NEWEST">Newest First</option>
+                      <option value="UPDATED">Recently Updated</option>
                       <option value="OLDEST">Oldest First</option>
                       <option value="FACTORY">Submitted Factory (A-Z)</option>
                     </select>
@@ -3619,6 +3672,30 @@
                       class="px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1 border border-transparent dark:border-slate-700"
                     >
                       <span> Urgent Only</span>
+                    </button>
+
+                    <!-- Sync Orders from Google Sheets Button -->
+                    <button
+                      @click="syncFromGoogleSheets(true)"
+                      :disabled="isPulling"
+                      class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      title="Pull latest order submissions and edits from Google Sheets"
+                    >
+                      <svg
+                        class="w-3.5 h-3.5"
+                        :class="isPulling ? 'animate-spin' : ''"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                      <span>{{ isPulling ? 'Syncing...' : 'Sync Orders' }}</span>
                     </button>
 
                     <!-- Sync Steadfast Statuses Button -->
@@ -4125,12 +4202,12 @@
                                 </button>
                               </div>
                               <div
-                                v-if="ord.combinedDriveUrl"
+                                v-if="ord.combinedPhotoLocalUrl || ord.combinedDriveUrl"
                                 class="flex items-center gap-1 mt-1"
                               >
                                 <button
                                   type="button"
-                                  @click.stop="openOriginalImage(ord.combinedDriveUrl)"
+                                  @click.stop="openOriginalImage(ord.combinedPhotoLocalUrl || ord.combinedDriveUrl)"
                                   class="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 bg-blue-50/80 dark:bg-blue-950/80 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800 cursor-pointer"
                                   title="Open Combined Photo"
                                 >
@@ -4281,6 +4358,10 @@
               </div>
             </transition>
 
+            <!-- =========================================================================
+     [HTML-SEGMENT 09/19]: VIEW 03 - PAYABLES AUDIT & FACTORY INVOICE RECONCILIATION
+     Capabilities: Factory payables balance, invoice verification, bill management
+     ========================================================================= -->
             <!-- ==================== ADMIN: PAYABLES AUDIT ==================== -->
             <transition name="pane-fade" mode="out-in">
               <div
@@ -4553,6 +4634,10 @@
               </div>
             </transition>
 
+            <!-- =========================================================================
+     [HTML-SEGMENT 10/19]: VIEW 04 - FINANCE LEDGER & OPERATIONAL EXPENSES
+     Capabilities: Daily expense logging, category filtering, profit/loss balance
+     ========================================================================= -->
             <!-- ==================== ADMIN: FINANCE LEDGER & EXPENSES ==================== -->
             <transition name="pane-fade" mode="out-in">
               <div
@@ -4932,6 +5017,10 @@
               </div>
             </transition>
 
+            <!-- =========================================================================
+     [HTML-SEGMENT 11/19]: VIEW 05 - FACTORY NETWORK & PRIORITY WORKLOAD DISPATCH
+     Capabilities: Factory capacity balancing, priority queuing, dispatch health
+     ========================================================================= -->
             <!-- ==================== ADMIN: FACTORY NETWORK & PRIORITY DISPATCH ==================== -->
             <transition name="pane-fade" mode="out-in">
               <div
@@ -5253,6 +5342,10 @@
               </div>
             </transition>
 
+            <!-- =========================================================================
+     [HTML-SEGMENT 12/19]: VIEW 06 - TRASH & DELETED ORDERS AUDIT VAULT
+     Capabilities: Soft-deleted order inspection, one-click restoration, permanent empty
+     ========================================================================= -->
             <!-- ==================== ADMIN: TRASH / DELETED ORDERS ==================== -->
             <transition name="pane-fade" mode="out-in">
               <div
@@ -5373,6 +5466,10 @@
                 </div>
               </div>
             </transition>
+            <!-- =========================================================================
+     [HTML-SEGMENT 13/19]: VIEW 07 - SYSTEM SETTINGS, PROFILE MANAGEMENT & BACKUP
+     Capabilities: Google Sheets config, user accounts, snapshot backup/restore, favicon
+     ========================================================================= -->
             <!-- ==================== ADMIN: SYSTEM SETTINGS ==================== -->
             <transition name="pane-fade" mode="out-in">
               <div
@@ -6157,6 +6254,10 @@
               </div>
             </transition>
 
+            <!-- =========================================================================
+     [HTML-SEGMENT 14/19]: VIEW 08 - MARKETING SPEND TRACKER & CAMPAIGN ANALYTICS
+     Capabilities: Daily ad spend recording, campaign ROI, marketer submission portal
+     ========================================================================= -->
             <!-- ==================== MARKETING SPEND TRACKER ==================== -->
             <transition name="pane-fade" mode="out-in">
               <div
@@ -6316,6 +6417,10 @@
                 </div>
               </div>
             </transition>
+            <!-- =========================================================================
+     [HTML-SEGMENT 15/19]: VIEW 09 - SELLER WORKSPACE: SMART ORDER INTAKE & PARSER
+     Capabilities: Omni-clipboard parser, phone fraud check, photo upload, quick submit
+     ========================================================================= -->
             <!-- ==================== SELLER: ORDER INTAKE & PARSER ==================== -->
             <transition name="pane-fade" mode="out-in">
               <div
@@ -7254,6 +7359,10 @@
               </div>
             </transition>
 
+            <!-- =========================================================================
+     [HTML-SEGMENT 16/19]: VIEW 10 - SELLER WORKSPACE: MY ORDERS ENTRY ARCHIVE
+     Capabilities: Merchant-isolated ledger, status tracking, order reprint, parcel search
+     ========================================================================= -->
             <!-- ==================== SELLER: MY ENTRY ARCHIVE ==================== -->
             <transition name="pane-fade" mode="out-in">
               <div
@@ -7280,9 +7389,22 @@
                       >
                         📊 Date-Wise Analytics
                       </button>
+                      <button
+                        v-if="currentUser.role === 'admin' || currentUser.role === 'moderator'"
+                        type="button"
+                        @click="activeTab = 'orders'"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 text-[11px] font-bold rounded-lg transition-all cursor-pointer shadow-2xs"
+                      >
+                        📋 Master Ledger (All {{ orders.length }} Orders) ↗
+                      </button>
                     </h2>
                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Locked history view of orders logged by {{ currentUser?.name }}
+                      <span v-if="currentUser.role === 'admin' || currentUser.role === 'moderator'">
+                        Personal logs submitted by {{ currentUser?.name }}. As a {{ currentUser?.role }}, you have full access to all team orders in the <button type="button" @click="activeTab = 'orders'" class="text-indigo-600 dark:text-indigo-400 underline font-bold cursor-pointer">Master Order Ledger</button>.
+                      </span>
+                      <span v-else>
+                        Locked history view of orders logged by {{ currentUser?.name }}
+                      </span>
                     </p>
                   </div>
 
@@ -7686,12 +7808,12 @@
                                 </button>
                               </div>
                               <div
-                                v-if="ord.combinedDriveUrl"
+                                v-if="ord.combinedDriveUrl || ord.combinedPhotoLocalUrl"
                                 class="flex items-center gap-1 mt-1"
                               >
                                 <button
                                   type="button"
-                                  @click.stop="openOriginalImage(ord.combinedDriveUrl)"
+                                  @click.stop="openOriginalImage(ord.combinedDriveUrl || ord.combinedPhotoLocalUrl)"
                                   class="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 bg-blue-50/80 dark:bg-blue-950/80 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800 cursor-pointer"
                                   title="Open Combined Photo"
                                 >
@@ -7899,7 +8021,11 @@
               </div>
             </transition>
 
-            <!-- TASKS & ASSIGNMENTS PAGE -->
+            <!-- =========================================================================
+     [HTML-SEGMENT 17/19]: VIEW 11 - TEAM TASKS, ROUTINES & 48-HOUR ORDER ESCALATION
+     Capabilities: Team assignments, daily routines, automated 48h pending order tasks
+     ========================================================================= -->
+        <!-- TASKS & ASSIGNMENTS PAGE -->
             <div
               v-if="activeTab === 'tasks'"
               class="p-6 max-w-6xl mx-auto animate-fade-in space-y-6"
@@ -8548,6 +8674,10 @@
           </footer>
         </div>
 
+        <!-- =========================================================================
+     [HTML-SEGMENT 18/19]: GLOBAL MODAL SYSTEM (22 SPECIALIZED WORKFLOW DIALOGS)
+     Dialogs: Edit Order, WhatsApp Dispatch, Bulk Dispatch, SFC Tracking, Fraud Modal, etc.
+     ========================================================================= -->
         <!-- GLOBAL CUSTOM MODAL SYSTEM LAYER -->
         <transition name="modal-anim">
           <div
@@ -9505,7 +9635,7 @@
                           </button>
                           <button
                             type="button"
-                            @click="modalData.order.collagePhotoUrl = ''; modalData.order.collagePhotoFileName = '';"
+                            @click="modalData.order.collagePhotoUrl = ''; modalData.order.collagePhotoFileName = ''; modalData.order.collagePhotoLocalUrl = ''; modalData.order.combinedDriveUrl = ''; modalData.order.combinedPhotoLocalUrl = ''; const ro = orders.find(o => o.id === modalData.order.id); if (ro) { ro.collagePhotoUrl = ''; ro.collagePhotoFileName = ''; ro.collagePhotoLocalUrl = ''; ro.combinedDriveUrl = ''; ro.combinedPhotoLocalUrl = ''; }"
                             class="p-1.5 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-500 rounded-lg transition-colors cursor-pointer"
                             title="Remove image"
                           >
@@ -9638,7 +9768,7 @@
                           </button>
                           <button
                             type="button"
-                            @click="modalData.order.socialProofUrl = ''; modalData.order.socialProofFileName = '';"
+                            @click="modalData.order.socialProofUrl = ''; modalData.order.socialProofFileName = ''; modalData.order.socialProofLocalUrl = ''; modalData.order.combinedDriveUrl = ''; modalData.order.combinedPhotoLocalUrl = ''; const ro = orders.find(o => o.id === modalData.order.id); if (ro) { ro.socialProofUrl = ''; ro.socialProofFileName = ''; ro.socialProofLocalUrl = ''; ro.combinedDriveUrl = ''; ro.combinedPhotoLocalUrl = ''; }"
                             class="p-1.5 hover:bg-rose-100 dark:hover:bg-rose-900/50 text-rose-500 rounded-lg transition-colors cursor-pointer"
                             title="Remove screenshot"
                           >
@@ -9667,7 +9797,7 @@
 
                   <!-- COMBINED PHOTO STATUS & LIVE REFRESH IN MODAL -->
                   <div
-                    v-if="modalData.order.combinedDriveUrl || modalData.order.collagePhotoUrl || modalData.order.socialProofUrl || modalData.order.collagePhotoLocalUrl || modalData.order.socialProofLocalUrl"
+                    v-if="modalData.order.combinedPhotoLocalUrl || modalData.order.combinedDriveUrl || modalData.order.collagePhotoUrl || modalData.order.socialProofUrl || modalData.order.collagePhotoLocalUrl || modalData.order.socialProofLocalUrl"
                     class="p-3 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/60 rounded-xl flex items-center justify-between gap-3 text-xs"
                   >
                     <div class="flex items-center gap-2">
@@ -9675,16 +9805,16 @@
                       <div>
                         <div class="font-bold text-blue-900 dark:text-blue-200">Combined Order Photo</div>
                         <div class="text-[10px] text-blue-600 dark:text-blue-400">
-                          <span v-if="modalData.order.combinedDriveUrl">Auto-updates whenever new photos are attached</span>
+                          <span v-if="modalData.order.combinedPhotoLocalUrl || modalData.order.combinedDriveUrl">Combined photo ready • Updates on regeneration</span>
                           <span v-else>Ready to compile once photo is attached</span>
                         </div>
                       </div>
                     </div>
                     <div class="flex items-center gap-2">
                       <button
-                        v-if="modalData.order.combinedDriveUrl"
+                        v-if="modalData.order.combinedPhotoLocalUrl || modalData.order.combinedDriveUrl"
                         type="button"
-                        @click.stop="openOriginalImage(modalData.order.combinedDriveUrl)"
+                        @click.stop="openOriginalImage(modalData.order.combinedPhotoLocalUrl || modalData.order.combinedDriveUrl)"
                         class="px-2.5 py-1 bg-white dark:bg-slate-900 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 font-bold rounded-lg text-[10px] hover:bg-blue-100 dark:hover:bg-blue-900 transition-all cursor-pointer shadow-xs"
                       >
                         Preview ↗
@@ -12469,6 +12599,10 @@
     </div>
 
     <!-- VUE 3 COMPOSITION / OPTIONS SCRIPT -->
+    <!-- =========================================================================
+     [HTML-SEGMENT 19/19]: GLOBAL SCRIPT ENTRYPOINT & VUE 3 APPLICATION MOUNT
+     Entrypoint: ./app.js (contains all 45 reactive subsystems and bootstrap hooks)
+     ========================================================================= -->
     <script type="module" src="./app.js"></script>
   </body>
 </html>
