@@ -14,9 +14,23 @@ async function startServer() {
 
   // --- VERSION & APPLICATION UPDATE CHECK ENDPOINTS ---
   const getAppVersionInfo = () => {
-    const appVersion = process.env.APP_VERSION || '4.3.0';
+    let appVersion = process.env.APP_VERSION || '4.3.0';
     let buildTime = Date.now();
     let buildId = `v${appVersion}`;
+    let releaseNotes = '';
+
+    try {
+      const versionFilePath = path.join(process.cwd(), 'version.json');
+      if (fs.existsSync(versionFilePath)) {
+        const fileData = JSON.parse(fs.readFileSync(versionFilePath, 'utf8'));
+        if (fileData && fileData.version) {
+          appVersion = fileData.version;
+          if (fileData.buildId) buildId = fileData.buildId;
+          if (fileData.buildTime) buildTime = fileData.buildTime;
+          if (fileData.releaseNotes) releaseNotes = fileData.releaseNotes;
+        }
+      }
+    } catch (e) {}
 
     try {
       const distIndexPath = path.join(process.cwd(), 'dist', 'index.html');
@@ -25,7 +39,9 @@ async function startServer() {
       if (targetFile) {
         const stat = fs.statSync(targetFile);
         buildTime = Math.floor(stat.mtimeMs);
-        buildId = `v${appVersion}-${buildTime}`;
+        if (!buildId || buildId === `v${appVersion}`) {
+          buildId = `v${appVersion}-${buildTime}`;
+        }
       }
     } catch (e) {}
 
@@ -34,6 +50,7 @@ async function startServer() {
       version: appVersion,
       buildId: buildId,
       buildTime: buildTime,
+      releaseNotes: releaseNotes,
       serverTime: new Date().toISOString()
     };
   };
