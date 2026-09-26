@@ -1433,6 +1433,19 @@ DIAGNOSTIC VIEW SEGMENT INDEX (19 SEGMENTS):
 
               <!-- Right User Controls & Logout -->
               <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Live App Update Badge (Pulsing when update available) -->
+                <button
+                  v-if="isUpdateAvailable"
+                  @click="openUpdatePrompt"
+                  type="button"
+                  title="New version available! Click to reload"
+                  class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-all shadow-xs text-xs font-bold animate-pulse cursor-pointer"
+                >
+                  <span class="text-sm">🚀</span>
+                  <span class="hidden sm:inline">Update Ready</span>
+                  <span class="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
+                </button>
+
                 <!-- Notifications Bell -->
                 <button
                   @click="activeTab = 'tasks'"
@@ -5575,6 +5588,63 @@ DIAGNOSTIC VIEW SEGMENT INDEX (19 SEGMENTS):
                         </svg>
                         Restore from Snapshot
                       </button>
+                    </div>
+                  </div>
+
+                  <!-- APPLICATION VERSION & LIVE UPDATES HUB -->
+                  <div
+                    class="mt-8 pt-6 border-t border-slate-200 dark:border-slate-800"
+                  >
+                    <div
+                      class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3"
+                    >
+                      <div>
+                        <h4
+                          class="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2"
+                        >
+                          <span>App Version & System Updates</span>
+                          <span
+                            class="px-2 py-0.5 rounded-full text-[10px] font-extrabold"
+                            :class="isUpdateAvailable ? 'bg-indigo-600 text-white animate-pulse' : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'"
+                          >
+                            {{ isUpdateAvailable ? 'Update Ready' : 'v' + currentAppVersion + ' (Latest)' }}
+                          </span>
+                        </h4>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          Automatically checks for background deployments and updates without losing unsaved changes.
+                        </p>
+                      </div>
+
+                      <div class="flex items-center gap-2">
+                        <button
+                          type="button"
+                          @click="checkForAppUpdates(true)"
+                          :disabled="isCheckingUpdate"
+                          class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          <span v-if="isCheckingUpdate" class="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                          <span v-else>🔍</span>
+                          <span>Check for Updates</span>
+                        </button>
+
+                        <button
+                          v-if="isUpdateAvailable"
+                          type="button"
+                          @click="openUpdatePrompt"
+                          class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer animate-pulse"
+                        >
+                          <span>🚀</span>
+                          <span>Reload to Update</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div
+                      v-if="updateCheckStatusText"
+                      class="p-2.5 rounded-xl text-xs font-medium transition-all"
+                      :class="updateCheckStatusText.includes('🚀') ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800' : (updateCheckStatusText.includes('⚠️') ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800' : 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800')"
+                    >
+                      {{ updateCheckStatusText }}
                     </div>
                   </div>
 
@@ -12590,6 +12660,106 @@ DIAGNOSTIC VIEW SEGMENT INDEX (19 SEGMENTS):
                       Save Daily Targets
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </transition>
+
+        <!-- =========================================================================
+         [NEW VERSION AVAILABLE POPUP MODAL / PROMPT]
+         Triggered automatically when a new build or version is detected
+         ========================================================================= -->
+        <transition
+          enter-active-class="transition ease-out duration-300 transform"
+          enter-from-class="opacity-0 translate-y-8 scale-95"
+          enter-to-class="opacity-100 translate-y-0 scale-100"
+          leave-active-class="transition ease-in duration-200 transform"
+          leave-from-class="opacity-100 translate-y-0 scale-100"
+          leave-to-class="opacity-0 translate-y-8 scale-95"
+        >
+          <div
+            v-if="isUpdateAvailable && showUpdatePrompt"
+            class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4 sm:p-6 bg-slate-950/60 backdrop-blur-xs"
+            @click.self="dismissUpdatePrompt"
+          >
+            <div
+              class="w-full max-w-md bg-white dark:bg-slate-900 border-2 border-indigo-500/40 dark:border-indigo-500/50 rounded-3xl shadow-2xl shadow-indigo-500/20 overflow-hidden transform transition-all"
+            >
+              <!-- Top Accent Gradient -->
+              <div class="h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 animate-pulse"></div>
+
+              <div class="p-6 space-y-4">
+                <!-- Header Icon & Title -->
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-2xl shadow-inner shrink-0">
+                      🚀
+                    </div>
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <h3 class="text-base font-black text-slate-900 dark:text-white tracking-tight">
+                          New Version Available!
+                        </h3>
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-600 text-white">
+                          v{{ latestServerVersion }}
+                        </span>
+                      </div>
+                      <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">
+                        A fresh update of HomeAura Hub is ready.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    @click="dismissUpdatePrompt"
+                    class="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Remind me later"
+                  >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- Update Details Card -->
+                <div class="bg-slate-50 dark:bg-slate-800/60 p-3.5 rounded-2xl border border-slate-200/70 dark:border-slate-700/60 space-y-2 text-xs">
+                  <div class="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                    <span class="font-medium">Current Version:</span>
+                    <span class="font-mono font-bold text-slate-500 dark:text-slate-400">v{{ currentAppVersion }}</span>
+                  </div>
+                  <div class="flex items-center justify-between text-slate-900 dark:text-slate-100">
+                    <span class="font-medium">Latest Available:</span>
+                    <span class="font-mono font-black text-indigo-600 dark:text-indigo-400">v{{ latestServerVersion }}</span>
+                  </div>
+                  <div class="pt-2 border-t border-slate-200 dark:border-slate-700/60 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Reloading updates the application bundle to load latest UI improvements, features, and sync fixes.
+                  </div>
+                  <div v-if="pendingSyncCount > 0" class="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800/60 text-[11px] text-amber-800 dark:text-amber-300">
+                    <span>🛡️</span>
+                    <span><strong>{{ pendingSyncCount }} pending change(s)</strong> will be safely synced to Google Sheets before reload.</span>
+                  </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    @click="dismissUpdatePrompt"
+                    :disabled="isReloadingForUpdate"
+                    class="flex-1 py-2.5 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                  >
+                    Later
+                  </button>
+                  <button
+                    type="button"
+                    @click="reloadForUpdate"
+                    :disabled="isReloadingForUpdate"
+                    class="flex-2 py-2.5 px-5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-black rounded-xl text-xs shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <span v-if="isReloadingForUpdate" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                    <span v-else>🔄</span>
+                    <span>{{ isReloadingForUpdate ? 'Saving & Reloading...' : 'Reload for Latest Version' }}</span>
+                  </button>
                 </div>
               </div>
             </div>

@@ -2762,6 +2762,18 @@
           isCopiedText: false
         });
 
+        // Version Check & Live Update System
+        const CURRENT_APP_VERSION = '4.3.0';
+        const currentAppVersion = ref(CURRENT_APP_VERSION);
+        const currentBuildId = ref(null);
+        const latestServerVersion = ref(CURRENT_APP_VERSION);
+        const latestServerBuildId = ref(null);
+        const isUpdateAvailable = ref(false);
+        const isCheckingUpdate = ref(false);
+        const showUpdatePrompt = ref(false);
+        const updateCheckStatusText = ref('');
+        const isReloadingForUpdate = ref(false);
+
         const bulkDispatchData = reactive({
           selectedFactoryId: null,
           isGeneratingPng: false,
@@ -7540,6 +7552,99 @@ Pushing to Google Sheets so all sellers sync this link automatically.`);
           }
         };
 
+        // --- VERSION CHECK & LIVE UPDATE LOGIC ---
+        const checkForAppUpdates = async (isManual = false) => {
+          if (isCheckingUpdate.value) return;
+          isCheckingUpdate.value = true;
+          if (isManual) {
+            updateCheckStatusText.value = 'Checking for updates...';
+          }
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 12000);
+            const res = await fetch(`/api/version?_cb=${Date.now()}`, {
+              cache: 'no-store',
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (res.ok) {
+              const data = await res.json();
+              if (data && data.buildId) {
+                // Baseline initialization on first check
+                if (!currentBuildId.value) {
+                  const storedInitial = sessionStorage.getItem('homeaura_initial_build_id');
+                  if (storedInitial) {
+                    currentBuildId.value = storedInitial;
+                  } else {
+                    currentBuildId.value = data.buildId;
+                    sessionStorage.setItem('homeaura_initial_build_id', data.buildId);
+                  }
+                }
+
+                latestServerVersion.value = data.version || CURRENT_APP_VERSION;
+                latestServerBuildId.value = data.buildId;
+
+                // Compare buildId or version
+                const isNewer = (currentBuildId.value && data.buildId !== currentBuildId.value) || 
+                                (data.version && data.version !== currentAppVersion.value);
+                if (isNewer) {
+                  isUpdateAvailable.value = true;
+                  showUpdatePrompt.value = true;
+                  if (isManual) {
+                    updateCheckStatusText.value = `🚀 New version available (${data.version || 'Latest'})!`;
+                  }
+                } else {
+                  isUpdateAvailable.value = false;
+                  if (isManual) {
+                    updateCheckStatusText.value = `✅ You are using the latest version (v${CURRENT_APP_VERSION})`;
+                    setTimeout(() => { updateCheckStatusText.value = ''; }, 5000);
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('[Version Check Notice]:', err.message);
+            if (isManual) {
+              updateCheckStatusText.value = '⚠️ Could not verify updates (network offline or busy).';
+              setTimeout(() => { updateCheckStatusText.value = ''; }, 4000);
+            }
+          } finally {
+            isCheckingUpdate.value = false;
+          }
+        };
+
+        const reloadForUpdate = async () => {
+          if (isReloadingForUpdate.value) return;
+          isReloadingForUpdate.value = true;
+          try {
+            // If there are pending unpushed changes, save and push them to Google Sheets first
+            if (pendingSyncCount.value > 0) {
+              syncNotice.value = '💾 Saving your unsynced changes to Google Sheets before reload...';
+              try {
+                await pushToGoogleSheets(false);
+              } catch (e) {
+                console.warn('[Update Reload] Pre-reload push warning:', e);
+              }
+            }
+            sessionStorage.removeItem('homeaura_initial_build_id');
+          } catch (e) {
+            console.warn('[Update Reload Error]', e);
+          } finally {
+            // Force hard reload bypassing cache
+            const cleanUrl = window.location.origin + window.location.pathname + '?_v=' + Date.now() + window.location.hash;
+            window.location.replace(cleanUrl);
+          }
+        };
+
+        const dismissUpdatePrompt = () => {
+          showUpdatePrompt.value = false;
+        };
+
+        const openUpdatePrompt = () => {
+          showUpdatePrompt.value = true;
+        };
+
         /* ============================================================================
  * [APP-SEGMENT 41/45]: GOOGLE APPS SCRIPT V4 BACKEND CODE GENERATOR & COPY
  * Responsibilities: Generates AppsScript.js source code for Google Sheets deployment
@@ -8407,10 +8512,23 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
             syncFromGoogleSheets().finally(() => { isInitialLoad.value = false; });
           }, 4000);
 
+          // Initial app update baseline check
+          setTimeout(() => {
+            checkForAppUpdates(false);
+          }, 2500);
+
+          // Periodic update check every 60 seconds
+          let updateCheckInterval = setInterval(() => {
+            if (!document.hidden && navigator.onLine) {
+              checkForAppUpdates(false);
+            }
+          }, 60000);
+
           // Visibility change listener
           document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
               syncFromGoogleSheets().finally(() => { isInitialLoad.value = false; });
+              checkForAppUpdates(false);
             }
           });
 
@@ -8418,6 +8536,7 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           window.addEventListener('focus', () => {
             if (navigator.onLine) {
               syncFromGoogleSheets().finally(() => { isInitialLoad.value = false; });
+              checkForAppUpdates(false);
             }
           });
 
@@ -8817,6 +8936,20 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           resetFavicon,
           openFraudDetailModal,
           refreshModalFraudCheck,
+          CURRENT_APP_VERSION,
+          currentAppVersion,
+          currentBuildId,
+          latestServerVersion,
+          latestServerBuildId,
+          isUpdateAvailable,
+          isCheckingUpdate,
+          showUpdatePrompt,
+          updateCheckStatusText,
+          isReloadingForUpdate,
+          checkForAppUpdates,
+          reloadForUpdate,
+          dismissUpdatePrompt,
+          openUpdatePrompt,
         };
       } catch (e) {
     document.body.innerHTML += '<div style="color:red; background:white; position:fixed; top:50px; left:0; z-index:9999; padding: 20px;">APP.JS ERROR: ' + e.message + '<br>' + e.stack + '</div>';

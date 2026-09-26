@@ -3,6 +3,7 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import path from 'path';
+import fs from 'fs';
 
 async function startServer() {
   const app = express();
@@ -11,7 +12,47 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-    // --- IMAGE PROXY TO BYPASS CORS ---
+  // --- VERSION & APPLICATION UPDATE CHECK ENDPOINTS ---
+  const getAppVersionInfo = () => {
+    const appVersion = process.env.APP_VERSION || '4.3.0';
+    let buildTime = Date.now();
+    let buildId = `v${appVersion}`;
+
+    try {
+      const distIndexPath = path.join(process.cwd(), 'dist', 'index.html');
+      const rootIndexPath = path.join(process.cwd(), 'index.html');
+      const targetFile = fs.existsSync(distIndexPath) ? distIndexPath : (fs.existsSync(rootIndexPath) ? rootIndexPath : null);
+      if (targetFile) {
+        const stat = fs.statSync(targetFile);
+        buildTime = Math.floor(stat.mtimeMs);
+        buildId = `v${appVersion}-${buildTime}`;
+      }
+    } catch (e) {}
+
+    return {
+      status: 'success',
+      version: appVersion,
+      buildId: buildId,
+      buildTime: buildTime,
+      serverTime: new Date().toISOString()
+    };
+  };
+
+  app.get('/api/version', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.json(getAppVersionInfo());
+  });
+
+  app.get('/version.json', (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.json(getAppVersionInfo());
+  });
+
+  // --- IMAGE PROXY TO BYPASS CORS ---
   app.get('/api/proxy-image', async (req, res) => {
     try {
       let imageUrl = req.query.url;
