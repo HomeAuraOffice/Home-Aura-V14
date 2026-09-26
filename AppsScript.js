@@ -143,6 +143,23 @@ function doGet(e) {
       return String(c);
     });
 
+    var rawVersion = sheetToObjects("version");
+    if (!rawVersion || rawVersion.length === 0) {
+      rawVersion = sheetToObjects("Version");
+    }
+    if (!rawVersion || rawVersion.length === 0) {
+      try {
+        var ss = SpreadsheetApp.getActiveSpreadsheet();
+        var vSheet = ss.getSheetByName("version") || ss.getSheetByName("Version");
+        if (!vSheet) {
+          vSheet = ss.insertSheet("version");
+          vSheet.appendRow(["id", "version", "releaseNotes", "minVersion", "updatedAt", "updatedBy"]);
+          vSheet.appendRow(["app_version", "1.0.2", "Combined photo regeneration fix & auto-update alerts", "1.0.0", new Date().toISOString(), "system"]);
+        }
+        rawVersion = sheetToObjects("version");
+      } catch(e) {}
+    }
+
     var data = {
       status: 'success',
       mode: 'full',
@@ -157,6 +174,7 @@ function doGet(e) {
       factoryBills: sheetToObjects("factoryBills"),
       expenses: sheetToObjects("expenses"),
       settings: sheetToObjects("settings"),
+      version: rawVersion,
       tasks: sheetToObjects("tasks"),
       notifications: sheetToObjects("notifications")
     };
@@ -263,6 +281,9 @@ function doPost(e) {
       if (changes.settings && changes.settings.length) {
         stats.updatedRecords += mergeObjectsByIdLWW("settings", changes.settings);
       }
+      if (changes.version && changes.version.length) {
+        stats.updatedRecords += mergeObjectsByIdLWW("version", changes.version);
+      }
       if (changes.tasks && changes.tasks.length) {
         stats.updatedRecords += mergeObjectsByIdLWW("tasks", changes.tasks);
       }
@@ -319,6 +340,7 @@ function doPost(e) {
     if (payloadObj.factoryBills) stats.updatedRecords += mergeObjectsByIdLWW("factoryBills", payloadObj.factoryBills);
     if (payloadObj.expenses) stats.updatedRecords += mergeObjectsByIdLWW("expenses", payloadObj.expenses);
     if (payloadObj.settings) stats.updatedRecords += mergeObjectsByIdLWW("settings", payloadObj.settings);
+    if (payloadObj.version) stats.updatedRecords += mergeObjectsByIdLWW("version", payloadObj.version);
     if (payloadObj.tasks) stats.updatedRecords += mergeObjectsByIdLWW("tasks", payloadObj.tasks);
     if (payloadObj.notifications) stats.updatedRecords += mergeObjectsByIdLWW("notifications", payloadObj.notifications);
 

@@ -1289,6 +1289,107 @@
         }
         const adminWaGroupLink = ref(initialStoredWa && initialStoredWa.trim().startsWith('http') ? initialStoredWa.trim() : DEFAULT_WA_GROUP_LINK);
 
+        // --- APP VERSION & AUTO-UPDATE ENGINE ---
+        const APP_VERSION = '1.0.2';
+        const currentAppVersion = ref(APP_VERSION);
+        const latestRemoteVersion = ref(localStorage.getItem('homeaura_remote_version') || APP_VERSION);
+        const versionReleaseNotes = ref(localStorage.getItem('homeaura_version_notes') || '');
+        const showVersionUpdatePopup = ref(false);
+        const isVersionDismissed = ref(false);
+        const newVersionInput = ref('');
+        const newVersionNotesInput = ref('');
+        const isSavingVersion = ref(false);
+
+        const isVersionNewer = (remoteVer, localVer) => {
+          if (!remoteVer || typeof remoteVer !== 'string') return false;
+          if (!localVer || typeof localVer !== 'string') return true;
+          const cleanRemote = remoteVer.trim().replace(/^v/i, '');
+          const cleanLocal = localVer.trim().replace(/^v/i, '');
+          if (!cleanRemote) return false;
+          if (cleanRemote === cleanLocal) return false;
+          const rParts = cleanRemote.split('.').map(n => parseInt(n, 10) || 0);
+          const lParts = cleanLocal.split('.').map(n => parseInt(n, 10) || 0);
+          for (let i = 0; i < Math.max(rParts.length, lParts.length); i++) {
+            const r = rParts[i] || 0;
+            const l = lParts[i] || 0;
+            if (r > l) return true;
+            if (r < l) return false;
+          }
+          return cleanRemote !== cleanLocal;
+        };
+
+        const isVersionOutdated = computed(() => {
+          return isVersionNewer(latestRemoteVersion.value, currentAppVersion.value);
+        });
+
+        const refreshPageForUpdate = () => {
+          try {
+            const targetUrl = new URL(window.location.href);
+            targetUrl.searchParams.set('_v', Date.now().toString());
+            window.location.href = targetUrl.toString();
+          } catch (e) {
+            window.location.reload();
+          }
+        };
+
+        const dismissVersionUpdatePopup = () => {
+          showVersionUpdatePopup.value = false;
+          isVersionDismissed.value = true;
+          setTimeout(() => {
+            isVersionDismissed.value = false;
+            if (isVersionOutdated.value) {
+              showVersionUpdatePopup.value = true;
+            }
+          }, 15 * 60 * 1000);
+        };
+
+        const openVersionModal = () => {
+          newVersionInput.value = latestRemoteVersion.value || APP_VERSION;
+          newVersionNotesInput.value = versionReleaseNotes.value || '';
+          activeModal.value = 'versionManagementModal';
+        };
+
+        const saveAppVersionToSheet = async () => {
+          const verToSave = (newVersionInput.value || '').trim();
+          if (!verToSave) {
+            alert('Please enter a valid version string (e.g. 1.0.3)');
+            return;
+          }
+          isSavingVersion.value = true;
+          try {
+            const notes = (newVersionNotesInput.value || '').trim();
+            latestRemoteVersion.value = verToSave;
+            versionReleaseNotes.value = notes;
+            localStorage.setItem('homeaura_remote_version', verToSave);
+            localStorage.setItem('homeaura_version_notes', notes);
+
+            queueChange('version', {
+              id: 'app_version',
+              version: verToSave,
+              releaseNotes: notes,
+              minVersion: '1.0.0',
+              updatedAt: getBstIsoString(),
+              updatedBy: currentUser.value?.username || 'admin'
+            });
+            queueChange('settings', {
+              id: 'app_version',
+              key: 'app_version',
+              value: verToSave,
+              description: notes,
+              updatedAt: getBstIsoString()
+            });
+
+            await pushToGoogleSheets(false);
+            alert(`✅ Version ${verToSave} saved & published to Google Sheets! Connected clients will now receive the update prompt.`);
+            closeModal();
+          } catch (err) {
+            console.error('Failed to save version to Google Sheets:', err);
+            alert('⚠️ Failed to save version: ' + err.message);
+          } finally {
+            isSavingVersion.value = false;
+          }
+        };
+
         // --- OPTIMAL MULTI-USER OUTBOX SYNC QUEUE (DELTA SYNC) ---
         const initSyncQueue = () => {
           try {
@@ -2182,6 +2283,38 @@
               }
             }
 
+            // 9. Version Checking from Google Sheets
+            let remoteVer = null;
+            let remoteNotes = '';
+            if (data.version && Array.isArray(data.version) && data.version.length > 0) {
+              const vObj = data.version[0];
+              remoteVer = vObj.version || vObj.app_version || vObj.ver || vObj.latestVersion || vObj.name;
+              remoteNotes = vObj.releaseNotes || vObj.notes || vObj.description || '';
+            } else if (data.settings && Array.isArray(data.settings)) {
+              const vSetting = data.settings.find(s => s && (s.id === 'app_version' || s.key === 'app_version' || s.name === 'app_version' || s.id === 'version' || s.key === 'version'));
+              if (vSetting) {
+                remoteVer = vSetting.value !== undefined ? vSetting.value : (vSetting.val || vSetting.version || '');
+                remoteNotes = vSetting.description || vSetting.notes || '';
+              }
+            } else if (data.appVersion) {
+              remoteVer = data.appVersion;
+            }
+
+            if (remoteVer && typeof remoteVer === 'string' && remoteVer.trim()) {
+              const cleanVer = remoteVer.trim();
+              latestRemoteVersion.value = cleanVer;
+              localStorage.setItem('homeaura_remote_version', cleanVer);
+              if (remoteNotes) {
+                versionReleaseNotes.value = remoteNotes;
+                localStorage.setItem('homeaura_version_notes', remoteNotes);
+              }
+              if (isVersionNewer(cleanVer, currentAppVersion.value)) {
+                if (!isVersionDismissed.value) {
+                  showVersionUpdatePopup.value = true;
+                }
+              }
+            }
+
             if (data.lastUpdate) {
               localStorage.setItem('homeaura_server_sync_timestamp', data.lastUpdate);
             } else if (data.serverTimestamp) {
@@ -2835,6 +2968,16 @@
               return;
             }
             targetObj.collagePhotoLocalUrl = base64Data;
+
+            // Immediately reflect local image in orders.value if editing an existing order
+            if (targetObj.id) {
+              const realOrder = orders.value.find(o => o.id === targetObj.id);
+              if (realOrder) {
+                realOrder.collagePhotoLocalUrl = base64Data;
+                realOrder.collagePhotoFileName = fileName;
+                realOrder.collagePhotoUrl = '';
+              }
+            }
             
             if (!appsScriptUrl.value) {
               if (targetObj === intakeForm) parseSuccessMsg.value = '⚠️ No Google Script URL set to upload image.';
@@ -2884,7 +3027,7 @@
                     queueChange('orders', realOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
-                    updateOrderCombinedPhoto(realOrder.id);
+                    updateOrderCombinedPhoto(realOrder.id, true);
                   }
                 } else {
                   // Match in-flight order submitted before upload finished
@@ -2901,7 +3044,7 @@
                     queueChange('orders', recentOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
-                    updateOrderCombinedPhoto(recentOrder.id);
+                    updateOrderCombinedPhoto(recentOrder.id, true);
                   }
                 }
             } else if (result.error) {
@@ -2980,6 +3123,16 @@
             }
             targetObj.socialProofLocalUrl = base64Data;
 
+            // Immediately reflect local image in orders.value if editing an existing order
+            if (targetObj.id) {
+              const realOrder = orders.value.find(o => o.id === targetObj.id);
+              if (realOrder) {
+                realOrder.socialProofLocalUrl = base64Data;
+                realOrder.socialProofFileName = fileName;
+                realOrder.socialProofUrl = '';
+              }
+            }
+
             if (!appsScriptUrl.value) {
               if (targetObj === intakeForm) parseSuccessMsg.value = '⚠️ No Google Script URL set to upload proof.';
               targetObj.isUploadingProof = false;
@@ -3025,7 +3178,7 @@
                     queueChange('orders', realOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
-                    updateOrderCombinedPhoto(realOrder.id);
+                    updateOrderCombinedPhoto(realOrder.id, true);
                   }
                 } else {
                   // Match in-flight order submitted before upload finished
@@ -3042,7 +3195,7 @@
                     queueChange('orders', recentOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
-                    updateOrderCombinedPhoto(recentOrder.id);
+                    updateOrderCombinedPhoto(recentOrder.id, true);
                   }
                 }
             } else if (result.error) {
@@ -3098,8 +3251,33 @@
           if (!orderOrId) return null;
           const orderId = typeof orderOrId === 'string' ? orderOrId : orderOrId.id;
           if (!orderId) return null;
-          const realOrder = orders.value.find(o => o.id === orderId) || (typeof orderOrId === 'object' ? orderOrId : null);
+          let realOrder = orders.value.find(o => o.id === orderId);
+          if (!realOrder && typeof orderOrId === 'object') {
+            realOrder = orderOrId;
+          }
           if (!realOrder) return null;
+
+          // Merge latest photo URLs and state if passed from an object (e.g. edit modal or temporary state)
+          if (typeof orderOrId === 'object' && orderOrId !== realOrder) {
+            if (orderOrId.collagePhotoLocalUrl !== undefined) realOrder.collagePhotoLocalUrl = orderOrId.collagePhotoLocalUrl;
+            if (orderOrId.collagePhotoUrl !== undefined) realOrder.collagePhotoUrl = orderOrId.collagePhotoUrl;
+            if (orderOrId.socialProofLocalUrl !== undefined) realOrder.socialProofLocalUrl = orderOrId.socialProofLocalUrl;
+            if (orderOrId.socialProofUrl !== undefined) realOrder.socialProofUrl = orderOrId.socialProofUrl;
+            if (orderOrId.collagePhotoFileName) realOrder.collagePhotoFileName = orderOrId.collagePhotoFileName;
+            if (orderOrId.socialProofFileName) realOrder.socialProofFileName = orderOrId.socialProofFileName;
+            if (orderOrId.customerName) realOrder.customerName = orderOrId.customerName;
+            if (orderOrId.productCategory) realOrder.productCategory = orderOrId.productCategory;
+            if (orderOrId.seatConfig) realOrder.seatConfig = orderOrId.seatConfig;
+            if (orderOrId.fabric) realOrder.fabric = orderOrId.fabric;
+            if (orderOrId.extraDetails) realOrder.extraDetails = orderOrId.extraDetails;
+          } else if (modalData.order && modalData.order.id === orderId) {
+            if (modalData.order.collagePhotoLocalUrl !== undefined) realOrder.collagePhotoLocalUrl = modalData.order.collagePhotoLocalUrl;
+            if (modalData.order.collagePhotoUrl !== undefined) realOrder.collagePhotoUrl = modalData.order.collagePhotoUrl;
+            if (modalData.order.socialProofLocalUrl !== undefined) realOrder.socialProofLocalUrl = modalData.order.socialProofLocalUrl;
+            if (modalData.order.socialProofUrl !== undefined) realOrder.socialProofUrl = modalData.order.socialProofUrl;
+            if (modalData.order.collagePhotoFileName) realOrder.collagePhotoFileName = modalData.order.collagePhotoFileName;
+            if (modalData.order.socialProofFileName) realOrder.socialProofFileName = modalData.order.socialProofFileName;
+          }
 
           const hasCollage = !!(realOrder.collagePhotoLocalUrl || realOrder.collagePhotoUrl);
           const hasProof = !!(realOrder.socialProofLocalUrl || realOrder.socialProofUrl);
@@ -3110,9 +3288,18 @@
 
           isGeneratingCombinedMap.value[orderId] = true;
           try {
-            const compositeData = await generateOrdersCompositePng([realOrder], 'HOMEAURA ORDER MANIFEST');
+            // Build a cloned composite snapshot object with the most accurate source URLs
+            const compositeOrderObj = { ...realOrder };
+            if (modalData.order && modalData.order.id === orderId) {
+              Object.assign(compositeOrderObj, modalData.order);
+            }
+            if (typeof orderOrId === 'object') {
+              Object.assign(compositeOrderObj, orderOrId);
+            }
+
+            const compositeData = await generateOrdersCompositePng([compositeOrderObj], 'HOMEAURA ORDER MANIFEST');
             if (compositeData && compositeData.dataUrl) {
-              const autoCn = realOrder.cnNumber || realOrder.id;
+              const autoCn = compositeOrderObj.cnNumber || compositeOrderObj.id;
               const fileName = `combined_${String(autoCn).replace(/[^a-zA-Z0-9-]/g, '')}_${Date.now()}.jpg`;
               const uploadedUrl = await uploadCompositePngToDrive(compositeData.dataUrl, fileName, 'HomeAura_Order_Composites');
               if (uploadedUrl) {
@@ -3122,9 +3309,20 @@
                 }
                 realOrder.updatedAt = getBstIsoString();
                 realOrder.updatedBy = currentUser.value?.username || 'system';
-                queueChange('orders', realOrder);
+
+                // Trigger Vue reactivity update across lists by replacing array item
+                const idx = orders.value.findIndex(o => o.id === orderId);
+                if (idx !== -1) {
+                  orders.value[idx] = { ...realOrder, combinedDriveUrl: uploadedUrl };
+                }
+
+                queueChange('orders', orders.value[idx] || realOrder);
                 saveOrdersLocally();
                 triggerAutoSync(true);
+
+                syncNotice.value = `✅ Combined photo for #${realOrder.id} updated!`;
+                setTimeout(() => { if (syncNotice.value?.includes(realOrder.id)) syncNotice.value = ''; }, 4000);
+
                 return uploadedUrl;
               }
             }
@@ -4608,8 +4806,8 @@
               return;
             }
 
-            // For remote URLs, proxy via backend to bypass CORS
-            const proxyUrl = '/api/proxy-image?url=' + encodeURIComponent(cleanUrl);
+            // For remote URLs, proxy via backend to bypass CORS (with cache-buster)
+            const proxyUrl = '/api/proxy-image?url=' + encodeURIComponent(cleanUrl) + '&_ts=' + Date.now();
             const img = new Image();
             img.crossOrigin = 'anonymous';
             img.onload = () => {
@@ -4621,7 +4819,7 @@
                 directImg.crossOrigin = 'anonymous';
                 directImg.onload = () => handleSuccess(directImg);
                 directImg.onerror = () => handleFail();
-                directImg.src = cleanUrl;
+                directImg.src = cleanUrl.includes('?') ? (cleanUrl + '&_ts=' + Date.now()) : (cleanUrl + '?_ts=' + Date.now());
               }
             };
             img.onerror = () => {
@@ -4630,7 +4828,7 @@
               directImg.crossOrigin = 'anonymous';
               directImg.onload = () => handleSuccess(directImg);
               directImg.onerror = () => handleFail();
-              directImg.src = cleanUrl;
+              directImg.src = cleanUrl.includes('?') ? (cleanUrl + '&_ts=' + Date.now()) : (cleanUrl + '?_ts=' + Date.now());
             };
             img.src = proxyUrl;
           });
@@ -8429,6 +8627,19 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           resetFavicon,
           openFraudDetailModal,
           refreshModalFraudCheck,
+          currentAppVersion,
+          latestRemoteVersion,
+          versionReleaseNotes,
+          showVersionUpdatePopup,
+          isVersionDismissed,
+          isVersionOutdated,
+          refreshPageForUpdate,
+          dismissVersionUpdatePopup,
+          newVersionInput,
+          newVersionNotesInput,
+          isSavingVersion,
+          openVersionModal,
+          saveAppVersionToSheet,
         };
       } catch (e) {
     document.body.innerHTML += '<div style="color:red; background:white; position:fixed; top:50px; left:0; z-index:9999; padding: 20px;">APP.JS ERROR: ' + e.message + '<br>' + e.stack + '</div>';

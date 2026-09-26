@@ -1417,6 +1417,27 @@
                   >
                 </button>
 
+                <!-- Top Version Status & Update Action Badge -->
+                <button
+                  v-if="isVersionOutdated"
+                  @click="showVersionUpdatePopup = true"
+                  type="button"
+                  title="A newer version is listed in Google Sheets. Click to review and refresh."
+                  class="px-2.5 py-1.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-600 dark:text-amber-400 text-xs font-bold flex items-center gap-1.5 cursor-pointer hover:bg-amber-500/25 transition-all shadow-xs animate-pulse"
+                >
+                  <span>🚀</span>
+                  <span class="hidden sm:inline">Update (v{{ latestRemoteVersion }})</span>
+                  <span class="sm:hidden">v{{ latestRemoteVersion }}</span>
+                </button>
+                <div
+                  v-else
+                  class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-[10px] font-mono text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                  :title="'Current Version: v' + currentAppVersion"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  <span>v{{ currentAppVersion }}</span>
+                </div>
+
                 <!-- Top Dark Mode Button -->
                 <button
                   @click="toggleDarkMode"
@@ -5961,6 +5982,68 @@
                   </div>
                 </div>
 
+                <!-- APPLICATION VERSION & UPDATE BROADCASTING -->
+                <div
+                  class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs"
+                >
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                    <div>
+                      <h3 class="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                        <span>🚀 Application Version & Update Broadcasting</span>
+                        <span
+                          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                          :class="isVersionOutdated ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200 dark:border-amber-800' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'"
+                        >
+                          <span class="w-1.5 h-1.5 rounded-full" :class="isVersionOutdated ? 'bg-amber-500 animate-ping' : 'bg-emerald-500'"></span>
+                          {{ isVersionOutdated ? 'New Version Listed in Cloud' : 'Up to Date' }}
+                        </span>
+                      </h3>
+                      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        Control the official app version registered in Google Sheets. When a newer version is saved, all users will receive an interactive refresh prompt to update their app.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                    <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                      <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Your Running Version</div>
+                      <div class="text-xl font-black text-indigo-600 dark:text-indigo-400 font-mono">v{{ currentAppVersion }}</div>
+                      <div class="text-[10px] text-slate-500 mt-1">Local client build</div>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                      <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Google Sheet Version</div>
+                      <div class="text-xl font-black text-slate-900 dark:text-white font-mono">v{{ latestRemoteVersion }}</div>
+                      <div class="text-[10px] text-slate-500 mt-1 truncate" :title="versionReleaseNotes">{{ versionReleaseNotes || 'No release notes' }}</div>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex flex-col justify-between gap-3">
+                      <div>
+                        <div class="text-[10px] font-bold text-indigo-900 dark:text-indigo-200 uppercase tracking-wider mb-1">Publish New Version</div>
+                        <div class="text-[11px] text-indigo-700 dark:text-indigo-300">Push version update to all team members</div>
+                      </div>
+                      <div class="flex gap-2">
+                        <button
+                          @click="openVersionModal"
+                          type="button"
+                          class="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          <span>✏️ Set New Version</span>
+                        </button>
+                        <button
+                          v-if="isVersionOutdated"
+                          @click="refreshPageForUpdate"
+                          type="button"
+                          class="py-2 px-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl transition-all shadow-sm flex items-center justify-center gap-1 cursor-pointer shrink-0"
+                          title="Refresh Now"
+                        >
+                          <span>🔄</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- GRID FOR CATALOG & USERS -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <!-- CATALOG SETUP -->
@@ -8547,6 +8630,51 @@
             </div>
           </footer>
         </div>
+
+        <!-- VERSION UPDATE PROMPT MODAL (HIGH VISIBILITY POPUP) -->
+        <transition name="modal-anim">
+          <div
+            v-if="showVersionUpdatePopup"
+            class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto"
+          >
+            <div
+              class="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full border-2 border-indigo-500/50 p-6 text-slate-900 dark:text-slate-100 text-center relative overflow-hidden my-auto"
+            >
+              <div class="absolute -top-12 -right-12 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+              <div class="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-cyan-500 text-white rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4 shadow-lg shadow-indigo-500/20 ring-4 ring-indigo-500/10 animate-bounce">
+                🚀
+              </div>
+              <h3 class="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-2">
+                New Version Available!
+              </h3>
+              <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-4">
+                A new version of <span class="font-bold text-indigo-600 dark:text-indigo-400">HomeAura ERP (v{{ latestRemoteVersion }})</span> is published in Google Sheets. You are currently running <span class="font-mono font-bold bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-xs">v{{ currentAppVersion }}</span>.
+              </p>
+              <div v-if="versionReleaseNotes" class="bg-indigo-50/50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 rounded-xl p-3 text-left text-xs text-slate-700 dark:text-slate-300 mb-5 max-h-28 overflow-y-auto">
+                <div class="font-bold text-indigo-700 dark:text-indigo-300 text-[11px] mb-1 flex items-center gap-1">
+                  <span>📋 Release Highlights:</span>
+                </div>
+                <div class="whitespace-pre-line text-[11px]">{{ versionReleaseNotes }}</div>
+              </div>
+              <div class="space-y-2">
+                <button
+                  type="button"
+                  @click="refreshPageForUpdate"
+                  class="w-full py-3 px-5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-extrabold text-sm rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+                >
+                  <span>🔄 Refresh to Update Now</span>
+                </button>
+                <button
+                  type="button"
+                  @click="dismissVersionUpdatePopup"
+                  class="w-full py-2 px-4 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                >
+                  Remind Me Later
+                </button>
+              </div>
+            </div>
+          </div>
+        </transition>
 
         <!-- GLOBAL CUSTOM MODAL SYSTEM LAYER -->
         <transition name="modal-anim">
@@ -11164,6 +11292,71 @@
                       :class="modalData.confirmButtonClass"
                     >
                       {{ modalData.confirmButtonText }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- VERSION MANAGEMENT MODAL -->
+                <div
+                  v-if="activeModal === 'versionManagementModal'"
+                  class="space-y-4 text-xs"
+                >
+                  <div class="bg-indigo-50 dark:bg-indigo-950/50 p-4 rounded-xl border border-indigo-200 dark:border-indigo-800 space-y-2">
+                    <div class="font-bold text-indigo-900 dark:text-indigo-200 text-sm flex items-center gap-2">
+                      <span>🚀 Publish App Version Update</span>
+                    </div>
+                    <p class="text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                      Publishing a new version updates Google Sheets. Connected users on previous versions will receive a real-time prompt to refresh their browser.
+                    </p>
+                  </div>
+
+                  <div class="space-y-3">
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                        New Version Number (e.g. 1.0.3)
+                      </label>
+                      <input
+                        v-model="newVersionInput"
+                        type="text"
+                        placeholder="1.0.3"
+                        class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-slate-900 dark:text-slate-100 font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      />
+                    </div>
+
+                    <div>
+                      <label class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                        Release Notes & Summary of Changes
+                      </label>
+                      <textarea
+                        v-model="newVersionNotesInput"
+                        rows="3"
+                        placeholder="e.g. Fixed combined photo regeneration, refreshed UI performance..."
+                        class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      ></textarea>
+                    </div>
+
+                    <div class="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800/60 rounded-xl text-[11px]">
+                      <span class="text-slate-500 dark:text-slate-400">Your Current Client Version:</span>
+                      <span class="font-bold font-mono text-indigo-600 dark:text-indigo-400">v{{ currentAppVersion }}</span>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      @click="closeModal"
+                      type="button"
+                      class="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-all text-xs cursor-pointer"
+                    >
+                      ✕ Cancel
+                    </button>
+                    <button
+                      @click="saveAppVersionToSheet"
+                      :disabled="isSavingVersion || !newVersionInput"
+                      type="button"
+                      class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span v-if="isSavingVersion" class="animate-spin">⏳</span>
+                      <span>Publish & Broadcast to Cloud</span>
                     </button>
                   </div>
                 </div>
