@@ -1,60 +1,3 @@
-/**
- * ============================================================================
- * HOMEAURA ERP & FULFILLMENT SYSTEM - CORE APPLICATION LOGIC
- * ============================================================================
- * DIAGNOSTIC ARCHITECTURE & SEGMENT INDEX (45 SEGMENTS)
- * 
- * [APP-SEGMENT 01]: INDEXEDDB CACHE & OFFLINE BLOB STORAGE
- * [APP-SEGMENT 02]: SYSTEM CONSTANTS, WORKFLOW STAGES & SEED DATA
- * [APP-SEGMENT 03]: BANGLADESH TIME UTILITIES (Asia/Dhaka, UTC+6)
- * [APP-SEGMENT 04]: CORE REACTIVE STATE MANAGEMENT
- * [APP-SEGMENT 05]: STEADFAST FRAUD CHECK ENGINE & REPUTATION AUDIT
- * [APP-SEGMENT 06]: TASK, ROUTINE & REMINDERS STATE MANAGEMENT
- * [APP-SEGMENT 07]: AUTOMATED 48H PENDING ORDER TASK DETECTOR & ESCALATION
- * [APP-SEGMENT 08]: OPTIMAL MULTI-USER OUTBOX SYNC QUEUE (DELTA SYNC)
- * [APP-SEGMENT 09]: BIDIRECTIONAL DELTA SYNC ENGINE (GOOGLE SHEETS)
- * [APP-SEGMENT 10]: THEME ENGINE & DARK MODE PERSISTENCE
- * [APP-SEGMENT 11]: LOCAL STORAGE PERSISTENCE & INITIAL LOAD
- * [APP-SEGMENT 12]: MODAL AND VIEW STATE MANAGEMENT
- * [APP-SEGMENT 13]: BRAND FAVICON MANAGEMENT ENGINE
- * [APP-SEGMENT 14]: FAST CLIENT-SIDE IMAGE COMPRESSION & DIRECT UPLOAD
- * [APP-SEGMENT 15]: SELLER STATUS ALLOWED PIPELINE
- * [APP-SEGMENT 16]: ACCESS CONTROL, ROLES & ORDER PERMISSION POLICY
- * [APP-SEGMENT 17]: STATUS & DELIVERY LIFECYCLE HELPERS
- * [APP-SEGMENT 18]: DYNAMIC FACTORY LOAD BALANCING & PRIORITY ENGINE
- * [APP-SEGMENT 19]: NUMBER & CURRENCY FORMATTING (BDT)
- * [APP-SEGMENT 20]: AUTHENTICATION & SESSION MANAGEMENT
- * [APP-SEGMENT 21]: COMPUTED METRICS & EXECUTIVE KPI ANALYTICS
- * [APP-SEGMENT 22]: DATE-WISE SALES BREAKDOWN & SPECIFIC DATE INSIGHTS
- * [APP-SEGMENT 23]: DAILY SALES TARGETS & INDIVIDUAL SELLER PROGRESS TRACKING
- * [APP-SEGMENT 24]: FAST PAGINATION ENGINE FOR MASTER ORDER LEDGER
- * [APP-SEGMENT 25]: SELLER (MY ORDERS) PAGINATION & SEARCH ENGINE
- * [APP-SEGMENT 26]: OMNI-CLIPBOARD PARSER ENGINE
- * [APP-SEGMENT 27]: HIGH-PERFORMANCE PNG CONVERTER & WORK ORDER COLLAGE GENERATOR
- * [APP-SEGMENT 28]: FACTORY BILLS, INVOICES AND OPERATING EXPENSES
- * [APP-SEGMENT 29]: WHATSAPP FACTORY DISPATCH INTEGRATION
- * [APP-SEGMENT 30]: BULK FACTORY DISPATCH ENGINE
- * [APP-SEGMENT 31]: COURIER TRACKING & STATUS MODALS
- * [APP-SEGMENT 32]: PHOTO LIGHTBOX & MEDIA VIEW METHOD
- * [APP-SEGMENT 33]: STATUS BADGE STYLING HELPER
- * [APP-SEGMENT 34]: STEADFAST COURIER (SFC) REAL-TIME DELIVERY STATUS INTEGRATION
- * [APP-SEGMENT 35]: FABRICS & CATEGORIES MANAGEMENT
- * [APP-SEGMENT 36]: CSV DATA EXPORT ENGINE
- * [APP-SEGMENT 37]: ORDER EDITING & MUTATION LOGIC
- * [APP-SEGMENT 38]: ORDER CANCELLATION, VOID AND TRASH ARCHIVE
- * [APP-SEGMENT 39]: BULK SELECTION & BATCH ACTIONS
- * [APP-SEGMENT 40]: SYSTEM SETTINGS, CONNECTIVITY & DIAGNOSTICS
- * [APP-SEGMENT 41]: GOOGLE APPS SCRIPT V4 BACKEND CODE GENERATOR & COPY
- * [APP-SEGMENT 42]: SNAPSHOT BACKUP IMPORT / EXPORT VAULT
- * [APP-SEGMENT 43]: USER PROFILE & TEAM MEMBER MANAGEMENT
- * [APP-SEGMENT 44]: DASHBOARD INTERACTIVE CHARTS (CHART.JS)
- * [APP-SEGMENT 45]: LIFECYCLE, AUTO-POLLING ENGINE & RUNTIME DIAGNOSTIC EXPORT
- * 
- * DIAGNOSTIC UTILITY: Run window.__HOMEAURA_DIAGNOSTICS__() in DevTools console
- * for a comprehensive real-time status audit across all system segments.
- * ============================================================================
- */
-
     const { createApp, ref, reactive, computed, onMounted, watch } = Vue;
 
     createApp({
@@ -63,11 +6,7 @@
 
         // --- 8-STAGE WORKFLOW PIPELINE ---
         
-        /* ============================================================================
- * [APP-SEGMENT 01/45]: INDEXEDDB CACHE & OFFLINE BLOB STORAGE
- * Responsibilities: Local binary image caching, IndexedDB schema, store retrieval
- * Diagnostic Focus: Offline image persistence, storage quota & blob URLs
- * ============================================================================ */
+        // --- INDEXEDDB IMAGE CACHE ---
         const DB_NAME = 'HomeAura_ImagesDB';
         const STORE_NAME = 'images';
 
@@ -142,11 +81,7 @@
           'Returned Received'
         ];
 
-        /* ============================================================================
- * [APP-SEGMENT 02/45]: SYSTEM CONSTANTS, WORKFLOW STAGES & SEED DATA
- * Responsibilities: Initial roles, factory fixtures, pipeline stages, status enums
- * Diagnostic Focus: Default fallbacks when network/sheet is empty
- * ============================================================================ */
+        // --- SEEDING DEFAULT USERS ---
         const defaultUsers = [];
 
         // --- SEEDING DEFAULT FACTORIES ---
@@ -165,11 +100,7 @@
         const defaultCategories = ['L-Shape Sofa', 'Sofa Set', 'Recliner Chair', 'Dining Table', 'Custom Bed', 'Living Room Accessories'];
         const defaultFabrics = ['Velvet', 'PU Leather', 'Jute', 'Cotton', 'Linen'];
 
-        /* ============================================================================
- * [APP-SEGMENT 03/45]: BANGLADESH TIME UTILITIES (Asia/Dhaka, UTC+6)
- * Responsibilities: Timezone synchronization, BST conversions, ISO formatters
- * Diagnostic Focus: Date parsing, midnight boundaries, order timestamps
- * ============================================================================ */
+        // --- BANGLADESH TIME UTILITIES (Asia/Dhaka, UTC+6) ---
         const getBangladeshDate = (dateInput = new Date()) => {
           if (!dateInput) dateInput = new Date();
           const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
@@ -393,11 +324,7 @@
           bangladeshTimeDisplay.value = getBangladeshClockString();
         }, 1000);
 
-        /* ============================================================================
- * [APP-SEGMENT 04/45]: CORE REACTIVE STATE MANAGEMENT
- * Responsibilities: Primary Vue 3 refs & reactives for orders, factories, users
- * Diagnostic Focus: Reactive bindings, state mutations, memory allocations
- * ============================================================================ */
+        // --- REACTIVE STATE MANAGEMENT ---
         const users = ref([]);
         const orders = ref([]);
         const deletedOrders = ref([]);
@@ -418,11 +345,7 @@
           return (Date.now() - new Date(timeStr).getTime()) < 5 * 60000;
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 05/45]: STEADFAST FRAUD CHECK ENGINE & REPUTATION AUDIT
- * Responsibilities: Delivery success rate check, return risk badges, courier fraud API
- * Diagnostic Focus: Fraud cache, rate limits, phone normalization
- * ============================================================================ */
+        // --- STEADFAST FRAUD CHECK ENGINE (TOP-LEVEL INITIALIZATION) ---
         const storedFraud = localStorage.getItem('homeaura_fraud_cache');
         let parsedFraud = {};
         try {
@@ -799,11 +722,7 @@
           }
         };
         
-        /* ============================================================================
- * [APP-SEGMENT 06/45]: TASK, ROUTINE & REMINDERS STATE MANAGEMENT
- * Responsibilities: Daily recurring routines, one-time reminders, assignee filters
- * Diagnostic Focus: Task creation, persistence, completion toggles
- * ============================================================================ */
+        // --- ADVANCED TASK & REMINDERS STATE MANAGEMENT ---
         const newTask = reactive({
           title: '',
           description: '',
@@ -1172,11 +1091,7 @@
           }
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 07/45]: AUTOMATED 48H PENDING ORDER TASK DETECTOR & ESCALATION
- * Responsibilities: Auto-detect stalled orders >48h, auto-escalate to moderators
- * Diagnostic Focus: Aging thresholds, duplicate task prevention, assignee allocation
- * ============================================================================ */
+        // --- AUTOMATED 48H PENDING ORDER TASK DETECTOR & ASSIGNMENT ---
         const isOrderStuckPending48h = (order) => {
           if (!order) return false;
           const status = (order.status || '').trim();
@@ -1365,7 +1280,7 @@
         const LEGACY_BAD_LINK = 'https://chat.whatsapp.com/HomeAuraOfficialTeam';
 
         // Apps Script Endpoint URL
-        const appsScriptUrl = ref(localStorage.getItem('homeaura_apps_script_url') || 'https://script.google.com/macros/s/AKfycbxap5GbDEQe8PrEs3gS2MPtrVgGDVSHmvK-qdPfklpbzHTPsQ3oEzHlFlF3J5FghTMeKw/exec');
+        const appsScriptUrl = ref('https://script.google.com/macros/s/AKfycbxap5GbDEQe8PrEs3gS2MPtrVgGDVSHmvK-qdPfklpbzHTPsQ3oEzHlFlF3J5FghTMeKw/exec');
         const backupFrequency = ref(localStorage.getItem('homeaura_backup_frequency') || '6');
         let initialStoredWa = localStorage.getItem('homeaura_admin_wa');
         if (initialStoredWa && initialStoredWa.includes('HomeAuraOfficialTeam')) {
@@ -1374,11 +1289,7 @@
         }
         const adminWaGroupLink = ref(initialStoredWa && initialStoredWa.trim().startsWith('http') ? initialStoredWa.trim() : DEFAULT_WA_GROUP_LINK);
 
-        /* ============================================================================
- * [APP-SEGMENT 08/45]: OPTIMAL MULTI-USER OUTBOX SYNC QUEUE (DELTA SYNC)
- * Responsibilities: Offline mutation queue, optimistic local commits, retry queue
- * Diagnostic Focus: Outbox queue length, uncommitted mutations, drain cycle
- * ============================================================================ */
+        // --- OPTIMAL MULTI-USER OUTBOX SYNC QUEUE (DELTA SYNC) ---
         const initSyncQueue = () => {
           try {
             const raw = localStorage.getItem('homeaura_sync_queue_v4');
@@ -1561,50 +1472,21 @@
           triggerAutoSync();
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 09/45]: BIDIRECTIONAL DELTA SYNC ENGINE (GOOGLE SHEETS)
- * Responsibilities: Remote pull, local push, conflict resolution, Google Apps Script bridge
- * Diagnostic Focus: Network latency, sync failures, payload serialization
- * ============================================================================ */
+        // --- BIDIRECTIONAL DELTA SYNC ENGINE ---
         let autoSyncTimeout = null;
-        let lastFailedPushTime = 0;
-        let pushFailureCount = 0;
-
         const triggerAutoSync = (immediate = false) => {
           if (!appsScriptUrl.value) return;
           if (autoSyncTimeout) clearTimeout(autoSyncTimeout);
-
           if (immediate) {
             pushToGoogleSheets(false);
-            return;
+          } else {
+            autoSyncTimeout = setTimeout(() => {
+              pushToGoogleSheets(false);
+            }, 1000); // 1-second batching debounce
           }
-
-          // Backoff delay if recent push had a network/timeout failure
-          let delay = 1500;
-          if (pushFailureCount > 0) {
-            const timeSinceFail = Date.now() - lastFailedPushTime;
-            if (timeSinceFail < 30000) {
-              delay = Math.min(pushFailureCount * 4000 + 2000, 25000);
-            } else {
-              pushFailureCount = 0;
-            }
-          }
-
-          autoSyncTimeout = setTimeout(() => {
-            pushToGoogleSheets(false);
-          }, delay);
         };
 
         const pushToGoogleSheets = async (forceFull = false, isUserTriggered = false) => {
-          if (!appsScriptUrl.value) return;
-          if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-            syncStatus.value = 'offline';
-            return;
-          }
-          if (isPushing.value) return;
-          if (!forceFull && pendingSyncCount.value === 0) return;
-
-          // Attach user activity timestamp only when pushing actual changes
           if (currentUser.value) {
             const myU = users.value.find(u => u && u?.username === currentUser.value?.username);
             if (myU) {
@@ -1614,6 +1496,13 @@
               saveSyncQueue();
             }
           }
+          if (!appsScriptUrl.value) return;
+          if (!navigator.onLine) {
+            syncStatus.value = 'offline';
+            return;
+          }
+          if (isPushing.value) return;
+          if (!forceFull && pendingSyncCount.value === 0) return;
 
           isPushing.value = true;
           isBackingUp.value = true;
@@ -1629,11 +1518,6 @@
             delete copy.collagePhotoBase64;
             delete copy.socialProofLocalUrl;
             delete copy.socialProofBase64;
-            delete copy.combinedPhotoLocalUrl;
-            delete copy.compositePngBlob;
-            delete copy.previewBlob;
-            delete copy.compositePngUrl;
-            delete copy.previewPngUrl;
             if (copy.collagePhotoUrl && (copy.collagePhotoUrl.startsWith('data:') || copy.collagePhotoUrl.startsWith('blob:'))) {
               copy.collagePhotoUrl = '';
             }
@@ -1768,13 +1652,10 @@
             saveSyncQueue();
             lastSyncTimestamp.value = getBangladeshClockString();
             localStorage.setItem('homeaura_last_sync_time', lastSyncTimestamp.value);
-            pushFailureCount = 0;
             syncStatus.value = 'synced';
           } catch (err) {
             console.warn('Push sync note (local outbox preserved):', err.message);
-            pushFailureCount++;
-            lastFailedPushTime = Date.now();
-            syncStatus.value = (typeof navigator !== 'undefined' && !navigator.onLine) ? 'offline' : 'error';
+            syncStatus.value = 'offline';
             if (isUserTriggered) {
               syncNotice.value = 'Sync push queued locally: ' + (err.name === 'AbortError' ? 'request timeout' : err.message);
               setTimeout(() => { syncNotice.value = ''; }, 5000);
@@ -1803,16 +1684,13 @@
             const timeoutId = setTimeout(() => controller.abort(new Error('Request timed out')), 45000);
 
             let fetchUrl = url;
-            const cb = Date.now();
-            fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + '_cb=' + cb;
             const serverSyncTime = localStorage.getItem('homeaura_server_sync_timestamp');
             if (!isUserTriggered && serverSyncTime && orders.value.length > 0) {
-              fetchUrl += '&since=' + encodeURIComponent(serverSyncTime);
+              fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + 'since=' + encodeURIComponent(serverSyncTime);
             }
 
             const res = await fetch(fetchUrl, {
               method: 'GET',
-              cache: 'no-store',
               signal: controller.signal
             });
             clearTimeout(timeoutId);
@@ -1942,64 +1820,57 @@
                 const localOrd = orders.value.find(o => String(o.id) === rId);
                 if (localOrd) {
                   const hasLocalPending = syncQueue.value.changes.orders && syncQueue.value.changes.orders[localOrd.id];
-                  let shouldAdoptServer = !hasLocalPending;
-                  
-                  if (hasLocalPending) {
-                    const remTime = remoteOrd.updatedAt ? new Date(remoteOrd.updatedAt).getTime() : 0;
+                  if (!hasLocalPending) {
                     const locTime = localOrd.updatedAt ? new Date(localOrd.updatedAt).getTime() : 0;
-                    if (remTime > locTime) {
-                      shouldAdoptServer = true;
-                      if (syncQueue.value.changes.orders) {
-                        delete syncQueue.value.changes.orders[localOrd.id];
-                        saveSyncQueue();
+                    const remTime = remoteOrd.updatedAt ? new Date(remoteOrd.updatedAt).getTime() : 0;
+                    if (remTime >= locTime || !localOrd.updatedAt) {
+                      const prevStatus = localOrd.status;
+                      const preservedLocalFactoryTag = localOrd.factoryTag || '';
+                      const preservedManualDelivered = localOrd.manualDeliveredOverride;
+                      const preservedManualCancelled = localOrd.manualCancelledOverride;
+                      const preservedManualHold = localOrd.manualHoldOverride;
+                      const preservedManualStatus = localOrd.manualStatusOverride;
+                      const preservedDeliveredAt = localOrd.deliveredAt;
+                      const preservedCancelledAt = localOrd.cancelledAt;
+                      const preservedPrevStatus = localOrd.previousStatus;
+                      Object.assign(localOrd, remoteOrd);
+                      // Preserve existing factory tag if remote was missing or blank
+                      if (!localOrd.factoryTag && preservedLocalFactoryTag) {
+                        localOrd.factoryTag = preservedLocalFactoryTag;
                       }
+                      if (preservedManualDelivered !== undefined) localOrd.manualDeliveredOverride = preservedManualDelivered;
+                      if (preservedManualCancelled !== undefined) localOrd.manualCancelledOverride = preservedManualCancelled;
+                      if (preservedManualHold !== undefined) localOrd.manualHoldOverride = preservedManualHold;
+                      if (preservedManualStatus !== undefined) localOrd.manualStatusOverride = preservedManualStatus;
+                      if (preservedDeliveredAt !== undefined && !remoteOrd.deliveredAt) localOrd.deliveredAt = preservedDeliveredAt;
+                      if (preservedCancelledAt !== undefined && !remoteOrd.cancelledAt) localOrd.cancelledAt = preservedCancelledAt;
+                      if (preservedPrevStatus && !localOrd.previousStatus) localOrd.previousStatus = preservedPrevStatus;
+                      if (prevStatus !== remoteOrd.status) updatedCount++;
                     }
-                  }
-
-                  if (shouldAdoptServer) {
-                    const prevStatus = localOrd.status;
-                    const preservedLocalFactoryTag = localOrd.factoryTag || '';
-                    
-                    // Adopt all authoritative server fields
-                    Object.assign(localOrd, remoteOrd);
-
-                    // Preserve local factory tag if server value is blank
-                    if (!localOrd.factoryTag && preservedLocalFactoryTag) {
-                      localOrd.factoryTag = preservedLocalFactoryTag;
-                    }
-
-                    // Adopt latest remote attachments and invalidate stale local cache if remote URL changed
-                    if (remoteOrd.collagePhotoUrl) {
-                      if (remoteOrd.collagePhotoUrl !== localOrd.collagePhotoUrl || (remoteOrd.collagePhotoFileName && remoteOrd.collagePhotoFileName !== localOrd.collagePhotoFileName)) {
-                        localOrd.collagePhotoLocalUrl = '';
-                      }
-                      localOrd.collagePhotoUrl = remoteOrd.collagePhotoUrl;
-                    }
-                    if (remoteOrd.collagePhotoFileName) {
-                      localOrd.collagePhotoFileName = remoteOrd.collagePhotoFileName;
-                    }
-                    if (remoteOrd.socialProofUrl) {
-                      if (remoteOrd.socialProofUrl !== localOrd.socialProofUrl || (remoteOrd.socialProofFileName && remoteOrd.socialProofFileName !== localOrd.socialProofFileName)) {
-                        localOrd.socialProofLocalUrl = '';
-                      }
-                      localOrd.socialProofUrl = remoteOrd.socialProofUrl;
-                    }
-                    if (remoteOrd.socialProofFileName) {
-                      localOrd.socialProofFileName = remoteOrd.socialProofFileName;
-                    }
-                    if (remoteOrd.combinedDriveUrl) {
-                      if (remoteOrd.combinedDriveUrl !== localOrd.combinedDriveUrl) {
-                        localOrd.combinedPhotoLocalUrl = '';
-                      }
-                      localOrd.combinedDriveUrl = remoteOrd.combinedDriveUrl;
-                    }
-
-                    if (prevStatus !== remoteOrd.status) updatedCount++;
                   } else {
                     // Retain factoryTag in pending local changes
                     if (localOrd.factoryTag && syncQueue.value.changes.orders[localOrd.id]) {
                       syncQueue.value.changes.orders[localOrd.id].factoryTag = localOrd.factoryTag;
                     }
+                  }
+                  
+                  // Ensure remote factoryTag updates local if local has none
+                  if (remoteOrd.factoryTag && !localOrd.factoryTag) {
+                    localOrd.factoryTag = remoteOrd.factoryTag;
+                  }
+                  
+                  // Ensure photo Google Drive URLs and file names from remote are always preserved and merged
+                  if (remoteOrd.collagePhotoUrl && (!localOrd.collagePhotoUrl || (localOrd.collagePhotoUrl.startsWith('data:') || localOrd.collagePhotoUrl.startsWith('blob:')))) {
+                    localOrd.collagePhotoUrl = remoteOrd.collagePhotoUrl;
+                  }
+                  if (remoteOrd.collagePhotoFileName && !localOrd.collagePhotoFileName) {
+                    localOrd.collagePhotoFileName = remoteOrd.collagePhotoFileName;
+                  }
+                  if (remoteOrd.socialProofUrl && (!localOrd.socialProofUrl || (localOrd.socialProofUrl.startsWith('data:') || localOrd.socialProofUrl.startsWith('blob:')))) {
+                    localOrd.socialProofUrl = remoteOrd.socialProofUrl;
+                  }
+                  if (remoteOrd.socialProofFileName && !localOrd.socialProofFileName) {
+                    localOrd.socialProofFileName = remoteOrd.socialProofFileName;
                   }
 
                   // Reconcile and preserve Steadfast Courier Delivery Status
@@ -2335,7 +2206,7 @@
             }
           } catch (err) {
             console.warn('Pull sync note (offline/local fallback):', err.message);
-            syncStatus.value = (typeof navigator !== 'undefined' && !navigator.onLine) ? 'offline' : 'error';
+            syncStatus.value = 'offline';
             if (isUserTriggered) {
               syncNotice.value = 'Offline mode: using local cache (' + (err.name === 'AbortError' ? 'request timeout' : err.message) + ')';
               setTimeout(() => { syncNotice.value = ''; }, 5000);
@@ -2349,11 +2220,7 @@
           return pushToGoogleSheets(!isAuto);
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 10/45]: THEME ENGINE & DARK MODE PERSISTENCE
- * Responsibilities: HTML root class manipulation, localStorage theme state
- * Diagnostic Focus: Dark mode toggle, color token contrast
- * ============================================================================ */
+        // --- DARK MODE LOGIC ---
         const isDarkMode = ref(localStorage.getItem('homeaura_dark') === 'true');
 
         const applyDarkMode = () => {
@@ -2372,11 +2239,7 @@
           applyDarkMode();
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 11/45]: LOCAL STORAGE PERSISTENCE & INITIAL LOAD
- * Responsibilities: Offline recovery from browser storage, instant startup state
- * Diagnostic Focus: Storage keys integrity, JSON parse safety
- * ============================================================================ */
+        // --- LOCAL STORAGE PERSISTENCE INITIAL LOAD ---
                 const getProxiedUrl = (url) => {
           if (!url) return '';
           if (url.startsWith('data:')) return url;
@@ -2390,15 +2253,6 @@
           if (!parsedUsrs || parsedUsrs.length === 0) parsedUsrs = defaultUsers;
           users.value = parsedUsrs;
           if (!storedUsers) localStorage.setItem('homeaura_users', JSON.stringify(defaultUsers));
-
-          const CANONICAL_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxap5GbDEQe8PrEs3gS2MPtrVgGDVSHmvK-qdPfklpbzHTPsQ3oEzHlFlF3J5FghTMeKw/exec';
-          const storedScript = localStorage.getItem('homeaura_apps_script_url');
-          if (storedScript && storedScript.trim().startsWith('http') && storedScript.includes('AKfy')) {
-            appsScriptUrl.value = storedScript.trim();
-          } else {
-            appsScriptUrl.value = CANONICAL_APPS_SCRIPT_URL;
-            localStorage.setItem('homeaura_apps_script_url', CANONICAL_APPS_SCRIPT_URL);
-          }
 
           const fakeOrderIds = new Set(['ORD-1001', 'ORD-1002', 'ORD-1003', 'ORD-1004', 'ORD-1005', 'ORD-1006', 'ORD-1007', 'ORD-1008', 'ORD-1009']);
           const storedOrders = localStorage.getItem('homeaura_orders');
@@ -2583,22 +2437,14 @@
           localStorage.setItem("homeaura_factories", JSON.stringify(factories.value));
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 12/45]: MODAL AND VIEW STATE MANAGEMENT
- * Responsibilities: Active modal dialog router, payload bindings, modal transitions
- * Diagnostic Focus: Modal visibility, stack cleanup, escape handlers
- * ============================================================================ */
+        // --- MODAL AND VIEW STATE ---
         const selectedProofTile = ref('');
         const selectProofTile = (tileKey) => { selectedProofTile.value = tileKey; selectedCollageTile.value = null; };
         
         const selectedCollageTile = ref('terminal');
         const selectCollageTile = (tileKey) => { selectedCollageTile.value = tileKey; selectedProofTile.value = null; };
 
-        /* ============================================================================
- * [APP-SEGMENT 13/45]: BRAND FAVICON MANAGEMENT ENGINE
- * Responsibilities: Dynamic favicon link injection, custom branding uploads
- * Diagnostic Focus: DOM link rel='icon' updates, base64 data URLs
- * ============================================================================ */
+        // --- BRAND FAVICON MANAGEMENT ---
         const customFavicon = ref(localStorage.getItem('homeaura_favicon') || '');
         const faviconInputUrl = ref('');
         const isFaviconSaving = ref(false);
@@ -2762,18 +2608,6 @@
           isCopiedText: false
         });
 
-        // Version Check & Live Update System
-        const CURRENT_APP_VERSION = '4.3.0';
-        const currentAppVersion = ref(CURRENT_APP_VERSION);
-        const currentBuildId = ref(null);
-        const latestServerVersion = ref(CURRENT_APP_VERSION);
-        const latestServerBuildId = ref(null);
-        const isUpdateAvailable = ref(false);
-        const isCheckingUpdate = ref(false);
-        const showUpdatePrompt = ref(false);
-        const updateCheckStatusText = ref('');
-        const isReloadingForUpdate = ref(false);
-
         const bulkDispatchData = reactive({
           selectedFactoryId: null,
           isGeneratingPng: false,
@@ -2913,11 +2747,7 @@
         };
 
         
-        /* ============================================================================
- * [APP-SEGMENT 14/45]: FAST CLIENT-SIDE IMAGE COMPRESSION & DIRECT UPLOAD
- * Responsibilities: Canvas image resizing, WebP/JPEG compression, base64 encoding
- * Diagnostic Focus: File size optimization, memory usage during upload
- * ============================================================================ */
+        // --- FAST CLIENT-SIDE IMAGE COMPRESSION & DIRECT UPLOAD ENGINE ---
         const compressImageForUpload = (file, maxDimension = 1600, quality = 0.85) => {
           return new Promise((resolve) => {
             if (!file || !file.type || !file.type.startsWith('image/')) {
@@ -2985,7 +2815,7 @@
           } else if (file.type === 'image/webp') {
             ext = 'webp';
           }
-          const fileName = `collage_${sellerUsername}_${cleanCn}_${Date.now()}.${ext}`;
+          const fileName = `collage_${sellerUsername}_${cleanCn}_${dateStr}.${ext}`;
           
           if (targetObj === intakeForm) {
             parseSuccessMsg.value = '⏳ Optimizing & uploading collage to Google Drive... Please wait.';
@@ -3005,16 +2835,6 @@
               return;
             }
             targetObj.collagePhotoLocalUrl = base64Data;
-            if (targetObj.id) {
-              const realOrder = orders.value.find(o => o.id === targetObj.id);
-              if (realOrder) {
-                realOrder.collagePhotoLocalUrl = base64Data;
-                realOrder.collagePhotoFileName = fileName;
-                realOrder.collagePhotoUrl = '';
-                realOrder.combinedDriveUrl = '';
-                realOrder.combinedPhotoLocalUrl = '';
-              }
-            }
             
             if (!appsScriptUrl.value) {
               if (targetObj === intakeForm) parseSuccessMsg.value = '⚠️ No Google Script URL set to upload image.';
@@ -3060,12 +2880,11 @@
                     realOrder.collagePhotoUrl = result.url;
                     realOrder.collagePhotoLocalUrl = base64Data;
                     realOrder.collagePhotoFileName = fileName;
-                    realOrder.combinedDriveUrl = '';
                     realOrder.updatedAt = getBstIsoString();
                     queueChange('orders', realOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
-                    updateOrderCombinedPhoto(realOrder.id, true);
+                    updateOrderCombinedPhoto(realOrder.id);
                   }
                 } else {
                   // Match in-flight order submitted before upload finished
@@ -3078,12 +2897,11 @@
                     recentOrder.collagePhotoUrl = result.url;
                     recentOrder.collagePhotoLocalUrl = base64Data;
                     recentOrder.collagePhotoFileName = fileName;
-                    recentOrder.combinedDriveUrl = '';
                     recentOrder.updatedAt = getBstIsoString();
                     queueChange('orders', recentOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
-                    updateOrderCombinedPhoto(recentOrder.id, true);
+                    updateOrderCombinedPhoto(recentOrder.id);
                   }
                 }
             } else if (result.error) {
@@ -3141,7 +2959,7 @@
           } else if (file.type === 'image/webp') {
             ext = 'webp';
           }
-          const fileName = `proof_${sellerUsername}_${cleanCn}_${Date.now()}.${ext}`;
+          const fileName = `proof_${sellerUsername}_${cleanCn}_${dateStr}.${ext}`;
 
           if (targetObj === intakeForm) {
             parseSuccessMsg.value = '⏳ Optimizing & uploading screenshot to Google Drive... Please wait.';
@@ -3161,16 +2979,6 @@
               return;
             }
             targetObj.socialProofLocalUrl = base64Data;
-            if (targetObj.id) {
-              const realOrder = orders.value.find(o => o.id === targetObj.id);
-              if (realOrder) {
-                realOrder.socialProofLocalUrl = base64Data;
-                realOrder.socialProofFileName = fileName;
-                realOrder.socialProofUrl = '';
-                realOrder.combinedDriveUrl = '';
-                realOrder.combinedPhotoLocalUrl = '';
-              }
-            }
 
             if (!appsScriptUrl.value) {
               if (targetObj === intakeForm) parseSuccessMsg.value = '⚠️ No Google Script URL set to upload proof.';
@@ -3213,12 +3021,11 @@
                     realOrder.socialProofUrl = result.url;
                     realOrder.socialProofLocalUrl = base64Data;
                     realOrder.socialProofFileName = fileName;
-                    realOrder.combinedDriveUrl = '';
                     realOrder.updatedAt = getBstIsoString();
                     queueChange('orders', realOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
-                    updateOrderCombinedPhoto(realOrder.id, true);
+                    updateOrderCombinedPhoto(realOrder.id);
                   }
                 } else {
                   // Match in-flight order submitted before upload finished
@@ -3231,12 +3038,11 @@
                     recentOrder.socialProofUrl = result.url;
                     recentOrder.socialProofLocalUrl = base64Data;
                     recentOrder.socialProofFileName = fileName;
-                    recentOrder.combinedDriveUrl = '';
                     recentOrder.updatedAt = getBstIsoString();
                     queueChange('orders', recentOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
-                    updateOrderCombinedPhoto(recentOrder.id, true);
+                    updateOrderCombinedPhoto(recentOrder.id);
                   }
                 }
             } else if (result.error) {
@@ -3295,25 +3101,6 @@
           const realOrder = orders.value.find(o => o.id === orderId) || (typeof orderOrId === 'object' ? orderOrId : null);
           if (!realOrder) return null;
 
-          // If order is actively being edited in modal, sync its latest attachments into realOrder
-          if (modalData.order && modalData.order.id === orderId) {
-            if (modalData.order.collagePhotoLocalUrl !== undefined) realOrder.collagePhotoLocalUrl = modalData.order.collagePhotoLocalUrl;
-            if (modalData.order.collagePhotoUrl !== undefined) realOrder.collagePhotoUrl = modalData.order.collagePhotoUrl;
-            if (modalData.order.collagePhotoFileName !== undefined) realOrder.collagePhotoFileName = modalData.order.collagePhotoFileName;
-            if (modalData.order.socialProofLocalUrl !== undefined) realOrder.socialProofLocalUrl = modalData.order.socialProofLocalUrl;
-            if (modalData.order.socialProofUrl !== undefined) realOrder.socialProofUrl = modalData.order.socialProofUrl;
-            if (modalData.order.socialProofFileName !== undefined) realOrder.socialProofFileName = modalData.order.socialProofFileName;
-          }
-
-          // Clear old Drive combined URL immediately so stale preview is NEVER opened while regenerating or on upload failure
-          realOrder.combinedDriveUrl = '';
-          if (typeof orderOrId === 'object') {
-            orderOrId.combinedDriveUrl = '';
-          }
-          if (modalData.order && modalData.order.id === orderId) {
-            modalData.order.combinedDriveUrl = '';
-          }
-
           const hasCollage = !!(realOrder.collagePhotoLocalUrl || realOrder.collagePhotoUrl);
           const hasProof = !!(realOrder.socialProofLocalUrl || realOrder.socialProofUrl);
 
@@ -3325,42 +3112,24 @@
           try {
             const compositeData = await generateOrdersCompositePng([realOrder], 'HOMEAURA ORDER MANIFEST');
             if (compositeData && compositeData.dataUrl) {
-              // Immediately update local preview so user sees new combined photo without delay
-              realOrder.combinedPhotoLocalUrl = compositeData.dataUrl;
-              if (typeof orderOrId === 'object') {
-                orderOrId.combinedPhotoLocalUrl = compositeData.dataUrl;
-              }
-              if (modalData.order && modalData.order.id === orderId) {
-                modalData.order.combinedPhotoLocalUrl = compositeData.dataUrl;
-              }
-
               const autoCn = realOrder.cnNumber || realOrder.id;
               const fileName = `combined_${String(autoCn).replace(/[^a-zA-Z0-9-]/g, '')}_${Date.now()}.jpg`;
               const uploadedUrl = await uploadCompositePngToDrive(compositeData.dataUrl, fileName, 'HomeAura_Order_Composites');
               if (uploadedUrl) {
                 realOrder.combinedDriveUrl = uploadedUrl;
-                if (typeof orderOrId === 'object') {
-                  orderOrId.combinedDriveUrl = uploadedUrl;
-                }
                 if (modalData.order && modalData.order.id === orderId) {
                   modalData.order.combinedDriveUrl = uploadedUrl;
                 }
+                realOrder.updatedAt = getBstIsoString();
+                realOrder.updatedBy = currentUser.value?.username || 'system';
+                queueChange('orders', realOrder);
+                saveOrdersLocally();
+                triggerAutoSync(true);
+                return uploadedUrl;
               }
-              realOrder.updatedAt = getBstIsoString();
-              realOrder.updatedBy = currentUser.value?.username || 'system';
-              queueChange('orders', realOrder);
-              saveOrdersLocally();
-              triggerAutoSync(true);
-              syncNotice.value = uploadedUrl 
-                ? '✅ Combined photo regenerated & saved to Google Drive!' 
-                : '✅ Combined photo regenerated locally!';
-              setTimeout(() => { syncNotice.value = ''; }, 4000);
-              return uploadedUrl || compositeData.dataUrl;
             }
           } catch (err) {
             console.warn('[Update Order Combined Photo Error]', err);
-            syncNotice.value = '⚠️ Failed to regenerate combined photo: ' + (err.message || 'Unknown error');
-            setTimeout(() => { syncNotice.value = ''; }, 4000);
           } finally {
             isGeneratingCombinedMap.value[orderId] = false;
           }
@@ -3395,11 +3164,7 @@
           }
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 15/45]: SELLER STATUS ALLOWED PIPELINE
- * Responsibilities: State machine defining permissible status transitions per role
- * Diagnostic Focus: RBAC state guards, unauthorized status overrides
- * ============================================================================ */
+        // --- SELLER STATUS ALLOWED PIPELINE ---
         const getAllowedStatusesForUser = (currentStatus) => {
           return allOrderStatuses;
         };
@@ -3434,11 +3199,7 @@
           }, 4000);
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 16/45]: ACCESS CONTROL, ROLES & ORDER PERMISSION POLICY
- * Responsibilities: canUserModifyOrder verification, admin/moderator/seller scopes
- * Diagnostic Focus: Authorization errors, multi-tenant merchant isolation
- * ============================================================================ */
+        // --- PERMISSION & ROLE MODIFICATION HELPER ---
         const canUserModifyOrder = (order) => {
           if (!order) return false;
           if (!currentUser.value) return true;
@@ -3463,11 +3224,7 @@
           return true;
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 17/45]: STATUS & DELIVERY LIFECYCLE HELPERS
- * Responsibilities: isOrderDelivered, isOrderCancelled, isOrderOnHold, factory warnings
- * Diagnostic Focus: Lifecycle classification, overdue alerts
- * ============================================================================ */
+        // --- STATUS & DELIVERY HELPERS ---
         const isOrderDelivered = (o) => {
           if (!o) return false;
           if (o.status === 'Cancelled' || o.status === 'Void') return false;
@@ -3554,11 +3311,7 @@
           return true;
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 18/45]: DYNAMIC FACTORY LOAD BALANCING & PRIORITY ENGINE
- * Responsibilities: Factory queue weight, active load calculation, capacity warnings
- * Diagnostic Focus: Workload distribution, factory bottleneck warnings
- * ============================================================================ */
+        // --- DYNAMIC FACTORY PRIORITY ENGINE ---
         const rankedFactories = computed(() => {
           return factories.value.map(f => {
             const pendingCount = orders.value.filter(o => isOrderPendingInFactory(o, f.name)).length;
@@ -3581,11 +3334,7 @@
           }).sort((a, b) => b.totalScore - a.totalScore);
         });
 
-        /* ============================================================================
- * [APP-SEGMENT 19/45]: NUMBER & CURRENCY FORMATTING (BDT)
- * Responsibilities: Bangladeshi Taka (৳) formatting, comma separators, parsing
- * Diagnostic Focus: Math precision, NaN safety, negative values
- * ============================================================================ */
+        // --- NUMBER & CURRENCY FORMATTING ---
         const cleanNumber = (val) => {
           if (val === undefined || val === null || val === '') return 0;
           if (typeof val === 'number') return isNaN(val) ? 0 : val;
@@ -3608,11 +3357,7 @@
           return sale + deliv;
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 20/45]: AUTHENTICATION & SESSION MANAGEMENT
- * Responsibilities: User login, session storage persistence, logout, role initialization
- * Diagnostic Focus: Active user session, credential validation, token expiry
- * ============================================================================ */
+        // --- AUTHENTICATION ---
         const handleLogin = async () => {
           loginError.value = '';
           isAuthenticating.value = true;
@@ -3660,11 +3405,7 @@
           localStorage.removeItem('homeaura_session');
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 21/45]: COMPUTED METRICS & EXECUTIVE KPI ANALYTICS
- * Responsibilities: Gross sales, net margin, delivery rate, operational efficiency
- * Diagnostic Focus: Metric accuracy, date filter application, cancel exclusion
- * ============================================================================ */
+        // --- COMPUTED METRICS ---
         
         const dashboardFilter = reactive({
           dateRange: 'all', // 'all', 'today', 'yesterday', 'specific', 'week', 'month', 'custom'
@@ -4039,11 +3780,7 @@
           return spends.reduce((sum, s) => sum + cleanNumber(s.amount), 0);
         });
 
-        /* ============================================================================
- * [APP-SEGMENT 22/45]: DATE-WISE SALES BREAKDOWN & SPECIFIC DATE INSIGHTS
- * Responsibilities: Group sales by calendar date, drill-down audit modal for dates
- * Diagnostic Focus: Grouping keys, chronological sorting, audit totals
- * ============================================================================ */
+        // --- DATE-WISE SALES BREAKDOWN & SPECIFIC DATE INSIGHTS ---
         const dateWiseBreakdownFilter = ref('14days'); // '7days', '14days', '30days', 'this_month', 'all'
         const dateWiseSearch = ref('');
         const selectedDateDetails = reactive({
@@ -4280,11 +4017,7 @@
           return list;
         });
 
-        /* ============================================================================
- * [APP-SEGMENT 23/45]: DAILY SALES TARGETS & INDIVIDUAL SELLER PROGRESS TRACKING
- * Responsibilities: Merchant performance bars, quota tracking, target modals
- * Diagnostic Focus: Progress bar percentages, target quota matching
- * ============================================================================ */
+        // --- DAILY SALES TARGETS & INDIVIDUAL SELLER PROGRESS TRACKING ---
         const dailyTargetDate = ref(getTodayBstDateString());
         const targetModalData = reactive({
           sellerId: null,
@@ -4506,27 +4239,6 @@
           return target > 0 ? Math.round((myMonthlySales.value / target) * 100) : 0;
         });
 
-        const parseOrderTime = (o) => {
-          if (!o) return 0;
-          if (o.timestamp) {
-            const t = new Date(o.timestamp).getTime();
-            if (!isNaN(t)) return t;
-          }
-          if (o.createdAt) {
-            const t = new Date(o.createdAt).getTime();
-            if (!isNaN(t)) return t;
-          }
-          if (o.orderDate) {
-            const t = new Date(o.orderDate).getTime();
-            if (!isNaN(t)) return t;
-          }
-          if (o.updatedAt) {
-            const t = new Date(o.updatedAt).getTime();
-            if (!isNaN(t)) return t;
-          }
-          return 0;
-        };
-
         const filteredOrders = computed(() => {
           let result = orders.value.filter(o => {
             if (statusFilter.value !== 'ALL') {
@@ -4554,15 +4266,9 @@
           });
 
           if (sortOption.value === 'NEWEST') {
-            result.sort((a, b) => parseOrderTime(b) - parseOrderTime(a));
-          } else if (sortOption.value === 'UPDATED') {
-            result.sort((a, b) => {
-              const uB = b.updatedAt ? new Date(b.updatedAt).getTime() : parseOrderTime(b);
-              const uA = a.updatedAt ? new Date(a.updatedAt).getTime() : parseOrderTime(a);
-              return uB - uA;
-            });
+            result.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
           } else if (sortOption.value === 'OLDEST') {
-            result.sort((a, b) => parseOrderTime(a) - parseOrderTime(b));
+            result.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
           } else if (sortOption.value === 'FACTORY') {
             result.sort((a, b) => {
               const fA = a.factoryTag || 'Z_Unassigned';
@@ -4574,11 +4280,7 @@
           return result;
         });
 
-        /* ============================================================================
- * [APP-SEGMENT 24/45]: FAST PAGINATION ENGINE FOR MASTER ORDER LEDGER
- * Responsibilities: Virtualized/sliced page views, multi-criteria filters, search indices
- * Diagnostic Focus: Page count calculations, search indexing performance
- * ============================================================================ */
+        // --- FAST PAGINATION ENGINE FOR ORDERS ---
         const ordersPerPage = ref(20);
         const orderCurrentPage = ref(1);
 
@@ -4654,18 +4356,29 @@
           }
         });
 
-        /* ============================================================================
- * [APP-SEGMENT 25/45]: SELLER (MY ORDERS) PAGINATION & SEARCH ENGINE
- * Responsibilities: Merchant-isolated pagination, personal status filter tabs
- * Diagnostic Focus: Merchant order boundary, personal quota filtering
- * ============================================================================ */
+        // --- SELLER (MY ORDERS) PAGINATION & SEARCH ENGINE ---
         const myOrderSearch = ref('');
         const myOrderStatusFilter = ref('ALL');
         const myOrderSortOption = ref('NEWEST');
         const myOrdersPerPage = ref(20);
         const myOrdersCurrentPage = ref(1);
 
-
+        const parseOrderTime = (o) => {
+          if (!o) return 0;
+          if (o.timestamp) {
+            const t = new Date(o.timestamp).getTime();
+            if (!isNaN(t)) return t;
+          }
+          if (o.createdAt) {
+            const t = new Date(o.createdAt).getTime();
+            if (!isNaN(t)) return t;
+          }
+          if (o.updatedAt) {
+            const t = new Date(o.updatedAt).getTime();
+            if (!isNaN(t)) return t;
+          }
+          return 0;
+        };
 
         const extractOrderNum = (id) => {
           if (!id) return 0;
@@ -4807,11 +4520,7 @@
           }
         });
 
-        /* ============================================================================
- * [APP-SEGMENT 26/45]: OMNI-CLIPBOARD PARSER ENGINE
- * Responsibilities: Raw Facebook/WhatsApp message parser, regex field extractor
- * Diagnostic Focus: Name/phone/address regex coverage, price & advance detection
- * ============================================================================ */
+        // --- OMNI-CLIPBOARD PARSER ENGINE ---
         const parseClipboard = async () => {
           const text = clipboardRawText.value;
           const image = intakeForm.socialProofBase64 || '';
@@ -4860,11 +4569,7 @@
         };
 
 
-        /* ============================================================================
- * [APP-SEGMENT 27/45]: HIGH-PERFORMANCE PNG CONVERTER & WORK ORDER COLLAGE GENERATOR
- * Responsibilities: HTML-to-Canvas render, multi-photo combined preview generation
- * Diagnostic Focus: Image CORS proxying, clipboard binary write, canvas scale
- * ============================================================================ */
+        // --- HIGH-PERFORMANCE PNG CONVERTER & CLIPBOARD ENGINE ---
         const loadImageSafe = (url) => {
           return new Promise((resolve) => {
             if (!url || typeof url !== 'string' || !url.trim()) return resolve(null);
@@ -4903,8 +4608,8 @@
               return;
             }
 
-            // For remote URLs, proxy via backend to bypass CORS (with cache-buster to prevent showing stale re-uploads)
-            const proxyUrl = '/api/proxy-image?url=' + encodeURIComponent(cleanUrl) + '&_cb=' + Date.now();
+            // For remote URLs, proxy via backend to bypass CORS
+            const proxyUrl = '/api/proxy-image?url=' + encodeURIComponent(cleanUrl);
             const img = new Image();
             img.crossOrigin = 'anonymous';
             img.onload = () => {
@@ -4965,21 +4670,10 @@
           // SPECIAL HIGH-DEFINITION RENDERING FOR SINGLE ORDER SUBMISSION
           if (ordersList.length === 1) {
             const ord = ordersList[0];
-            let collageImg = null;
-            if (ord.collagePhotoLocalUrl) {
-              collageImg = await loadImageSafe(ord.collagePhotoLocalUrl);
-            }
-            if (!collageImg && ord.collagePhotoUrl) {
-              collageImg = await loadImageSafe(ord.collagePhotoUrl);
-            }
-
-            let proofImg = null;
-            if (ord.socialProofLocalUrl) {
-              proofImg = await loadImageSafe(ord.socialProofLocalUrl);
-            }
-            if (!proofImg && ord.socialProofUrl) {
-              proofImg = await loadImageSafe(ord.socialProofUrl);
-            }
+            const collageSource = ord.collagePhotoLocalUrl || ord.collagePhotoUrl;
+            const proofSource = ord.socialProofLocalUrl || ord.socialProofUrl;
+            const collageImg = collageSource ? await loadImageSafe(collageSource) : null;
+            const proofImg = proofSource ? await loadImageSafe(proofSource) : null;
 
             const canvasWidth = 1120;
             const padding = 28;
@@ -5664,8 +5358,6 @@
             proofUploadToken: intakeForm.proofUploadToken || '',
             extraDetails: intakeForm.extraDetails || '',
             factoryTag: intakeForm.factoryTag || '',
-            combinedDriveUrl: '',
-            combinedPhotoLocalUrl: '',
             updatedAt: getBstIsoString(),
             updatedBy: currentUser.value ? currentUser.value?.username : 'seller'
           };
@@ -5790,7 +5482,6 @@
           try {
             const compositeData = await generateOrdersCompositePng([newOrder], 'HOMEAURA NEW ORDER REGISTRATION');
             if (compositeData && compositeData.blob) {
-              newOrder.combinedPhotoLocalUrl = compositeData.dataUrl;
               orderSuccessData.compositePngBlob = compositeData.blob;
               orderSuccessData.previewBlob = compositeData.blob;
               orderSuccessData.compositePngUrl = compositeData.dataUrl;
@@ -5798,25 +5489,31 @@
               if (clipboardWriteStarted) resolveClipboard(compositeData.blob);
 
               // Auto-upload combined photo to Google Drive
-              const autoCn = newOrder.cnNumber || newOrder.id;
-              const fileName = `combined_${String(autoCn).replace(/[^a-zA-Z0-9-]/g, '')}_${Date.now()}.jpg`;
-              uploadCompositePngToDrive(compositeData.dataUrl, fileName, 'HomeAura_Order_Composites')
-                .then(uploadedUrl => {
-                  if (uploadedUrl) {
-                    newOrder.combinedDriveUrl = uploadedUrl;
-                    if (orderSuccessData.order) {
-                      orderSuccessData.order.combinedDriveUrl = uploadedUrl;
-                    }
-                    newOrder.updatedAt = getBstIsoString();
-                    newOrder.updatedBy = currentUser.value ? currentUser.value?.username : 'seller';
+              const url = (appsScriptUrl.value || '').trim();
+              if (url && url.startsWith('http')) {
+                const autoCn = newOrder.cnNumber || newOrder.id;
+                const fileName = `combined_${autoCn.replace(/[^a-zA-Z0-9-]/g, '')}_${Date.now()}.jpg`;
+                fetch(url, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                  body: JSON.stringify({
+                    action: 'upload_image',
+                    filename: fileName,
+                    base64: compositeData.dataUrl,
+                    folder: 'HomeAura_Order_Composites'
+                  })
+                }).then(res => res.json()).then(result => {
+                  if (result.status === 'success' && result.url) {
+                    newOrder.combinedDriveUrl = result.url;
                     queueChange('orders', newOrder);
                     saveOrdersLocally();
                     triggerAutoSync(true);
                   }
-                })
-                .catch(err => {
+                }).catch(err => {
                   console.warn('Failed to auto-upload combined photo:', err);
                 });
+              }
+
             } else {
               orderSuccessData.previewPngUrl = 'FAILED';
               orderSuccessData.compositePngUrl = 'FAILED';
@@ -5906,11 +5603,7 @@
           triggerAutoSync(true);
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 28/45]: FACTORY BILLS, INVOICES AND OPERATING EXPENSES
- * Responsibilities: Payables audit, operational expense logging, balance calculation
- * Diagnostic Focus: Factory payment reconciliation, expense categorization
- * ============================================================================ */
+        // --- FACTORY BILLS AND EXPENSES ---
         const openAddBillModal = () => {
           modalData.title = 'Add Factory Bill & Payment';
           modalData.bill = reactive({ factoryId: '', sellerId: '', amount: '', overcharge: '', date: getBangladeshDateString(new Date()), notes: '', linkedOrderIds: [], photoUrl: '' });
@@ -6067,11 +5760,7 @@
           closeModal();
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 29/45]: WHATSAPP FACTORY DISPATCH INTEGRATION
- * Responsibilities: Formats production work order text, generates WhatsApp direct links
- * Diagnostic Focus: URL encoding, message templating, phone formatting
- * ============================================================================ */
+        // --- WHATSAPP FACTORY DISPATCH ---
         const openDispatchModal = (order) => {
           modalData.title = `WhatsApp Factory Dispatch (Order ${order.id})`;
           modalData.order = reactive({ ...order });
@@ -6233,11 +5922,7 @@ const executeWhatsAppDispatch = async () => {
           }
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 30/45]: BULK FACTORY DISPATCH ENGINE
- * Responsibilities: Multi-order batch dispatch, consolidated manifest, bulk status change
- * Diagnostic Focus: Batch payload collation, atomic status transitions
- * ============================================================================ */
+        // --- BULK FACTORY DISPATCH ENGINE ---
         const openBulkFactoryDispatchModal = () => {
           if (selectedOrders.value.size === 0) {
             alert('⚠️ Please select at least one order using the checkboxes.');
@@ -6459,11 +6144,7 @@ const executeBulkFactoryDispatch = async () => {
           }
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 31/45]: COURIER TRACKING & STATUS MODALS
- * Responsibilities: Courier consignment tracking dialog, consignment code lookup
- * Diagnostic Focus: Tracking URL validation, modal lifecycle
- * ============================================================================ */
+        // --- COURIER TRACKING MODAL ---
         const openCourierModal = (order) => {
           modalData.title = `Courier Site Verification: Order ${order.id}`;
           modalData.order = reactive({ ...order });
@@ -6487,11 +6168,7 @@ const executeBulkFactoryDispatch = async () => {
           closeModal();
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 32/45]: PHOTO LIGHTBOX & MEDIA VIEW METHOD
- * Responsibilities: Fullscreen zoom, high-res image inspection, rotation
- * Diagnostic Focus: Lightbox open/close state, image aspect ratios
- * ============================================================================ */
+        // --- PHOTO LIGHTBOX METHOD ---
         const openPhotoModal = (url, id, rawDriveUrl) => {
           modalData.title = `Photo Attachment - ${id || ''}`;
           modalData.url = url;
@@ -6500,28 +6177,16 @@ const executeBulkFactoryDispatch = async () => {
         };
 
         const openOriginalImage = (url, driveUrlFallback) => {
-          let targetUrl = url || driveUrlFallback;
+          let targetUrl = driveUrlFallback || url;
           if (!targetUrl) return;
           if (targetUrl.startsWith('/api/proxy-image?url=')) {
             targetUrl = decodeURIComponent(targetUrl.substring(targetUrl.indexOf('?url=') + 5));
           }
           if (targetUrl.startsWith('data:')) {
-            try {
-              const parts = targetUrl.split(',');
-              const mimeMatch = parts[0].match(/:(.*?);/);
-              const mime = mimeMatch ? mimeMatch[1] : 'image/png';
-              const binary = atob(parts[1]);
-              const array = new Uint8Array(binary.length);
-              for (let i = 0; i < binary.length; i++) array[i] = binary.charCodeAt(i);
-              const blob = new Blob([array], { type: mime });
+            fetch(targetUrl).then(r => r.blob()).then(blob => {
               const blobUrl = URL.createObjectURL(blob);
-              const newWin = window.open(blobUrl, '_blank');
-              if (!newWin) {
-                openPhotoModal(targetUrl, 'Photo Preview');
-              }
-            } catch (err) {
-              openPhotoModal(targetUrl, 'Photo Preview');
-            }
+              window.open(blobUrl, '_blank');
+            });
             return;
           }
           window.open(targetUrl, '_blank');
@@ -6533,11 +6198,7 @@ const executeBulkFactoryDispatch = async () => {
           activeModal.value = 'inspectModal';
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 33/45]: STATUS BADGE STYLING HELPER
- * Responsibilities: Tailwind color tokens and icons for each order status state
- * Diagnostic Focus: Visual hierarchy, contrast compliance in light/dark modes
- * ============================================================================ */
+        // --- STATUS STYLING HELPER ---
         const getStatusStyle = (status) => {
           switch (status) {
             case 'Confirmation Call': return 'bg-indigo-50 text-indigo-700 border-indigo-200';
@@ -6555,11 +6216,7 @@ const executeBulkFactoryDispatch = async () => {
           }
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 34/45]: STEADFAST COURIER (SFC) REAL-TIME DELIVERY STATUS INTEGRATION
- * Responsibilities: Direct courier API tracking, batch status sync, delivery webhooks
- * Diagnostic Focus: API credentials, rate limits, status mapping
- * ============================================================================ */
+        // --- STEADFAST COURIER (SFC) REAL-TIME DELIVERY STATUS INTEGRATION ---
         const sfcDeliveryStatuses = ref({});
         const sfcLoadingMap = ref({});
 
@@ -6823,11 +6480,7 @@ const executeBulkFactoryDispatch = async () => {
           }
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 35/45]: FABRICS & CATEGORIES MANAGEMENT
- * Responsibilities: Fabric preset options, product categories management
- * Diagnostic Focus: Catalog consistency, select options population
- * ============================================================================ */
+        // --- FABRICS ---
         const addFabric = () => {
           if (newFabricName.value && !fabrics.value.includes(newFabricName.value)) {
             fabrics.value.push(newFabricName.value);
@@ -6852,11 +6505,7 @@ const executeBulkFactoryDispatch = async () => {
 
         const removeCategory = (index) => { openGlobalConfirm('Are you sure you want to remove this category?', 'Remove Category', 'bg-rose-600 hover:bg-rose-500 text-white', () => { categories.value.splice(index, 1); queueChange('categories', categories.value); saveCategoriesLocally(); closeModal(); }); };
 
-        /* ============================================================================
- * [APP-SEGMENT 36/45]: CSV DATA EXPORT ENGINE
- * Responsibilities: Master ledger CSV download, filtered export, courier manifest CSV
- * Diagnostic Focus: Encoding (UTF-8 with BOM), delimiter escaping, row formatting
- * ============================================================================ */
+        // --- CSV EXPORT ---
         const exportCSV = () => {
           const headers = ['Order ID', 'CN Number', 'Timestamp', 'Merchant', 'Customer Name', 'Phone', 'Shipping Address', 'Source', 'Design Code', 'Product', 'Seat Config', 'Fulfillment', 'Sale Price (BDT)', 'Delivery Charge (BDT)', 'Total Price (BDT)', 'Pipeline Status', 'Urgent Flag', 'Local Attachment Path', 'Notes'];
           
@@ -6894,11 +6543,7 @@ const executeBulkFactoryDispatch = async () => {
           document.body.removeChild(link);
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 37/45]: ORDER EDITING & MUTATION LOGIC
- * Responsibilities: Order detail mutation, delivery charge recalculation, audit log
- * Diagnostic Focus: State immutability, mutation validation, price math
- * ============================================================================ */
+        // --- ORDER EDITING ---
         const openEditOrderModal = (order) => {
           if (currentUser.value?.role === 'seller' && order.merchantName !== currentUser.value?.name && order.merchantId !== currentUser.value?.id) {
             alert("⚠️ Security restriction: You cannot edit orders assigned to other merchants/sellers.");
@@ -7053,11 +6698,7 @@ const executeBulkFactoryDispatch = async () => {
           closeModal();
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 38/45]: ORDER CANCELLATION, VOID AND TRASH ARCHIVE
- * Responsibilities: Soft delete / trash storage, order reactivation, permanent void
- * Diagnostic Focus: Trash retention, recovery restore, analytics exclusion
- * ============================================================================ */
+        // --- VOID AND TRASH ---
         const cancelOrder = (order) => {
           if (!order) return;
           const target = orders.value.find(o => o.id === order.id) || order;
@@ -7278,11 +6919,7 @@ const executeBulkFactoryDispatch = async () => {
           });
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 39/45]: BULK SELECTION & BATCH ACTIONS
- * Responsibilities: Checkbox multi-select, batch delete, batch status change
- * Diagnostic Focus: Set synchronization, select all toggle, batch safety
- * ============================================================================ */
+        // --- BULK SELECTION ACTIONS ---
         const toggleOrderSelection = (id) => {
           if (selectedOrders.value.has(id)) {
             selectedOrders.value.delete(id);
@@ -7381,11 +7018,7 @@ const executeBulkFactoryDispatch = async () => {
           );
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 40/45]: SYSTEM SETTINGS, CONNECTIVITY & DIAGNOSTICS
- * Responsibilities: Google Apps Script URL configuration, connectivity tests
- * Diagnostic Focus: Network reachability, configuration persistence
- * ============================================================================ */
+        // --- SETTINGS AND DIAGNOSTICS ---
         const saveAppsScriptUrl = async () => { localStorage.setItem('homeaura_apps_script_url', appsScriptUrl.value); alert('Google Apps Script URL saved! Synchronizing database...'); await syncFromGoogleSheets(true); alert('Synchronization complete. You can now log in.'); };
 
                 const updateBackupFrequency = async () => {
@@ -7552,104 +7185,7 @@ Pushing to Google Sheets so all sellers sync this link automatically.`);
           }
         };
 
-        // --- VERSION CHECK & LIVE UPDATE LOGIC ---
-        const checkForAppUpdates = async (isManual = false) => {
-          if (isCheckingUpdate.value) return;
-          isCheckingUpdate.value = true;
-          if (isManual) {
-            updateCheckStatusText.value = 'Checking for updates...';
-          }
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 12000);
-            const res = await fetch(`/api/version?_cb=${Date.now()}`, {
-              cache: 'no-store',
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-
-            if (res.ok) {
-              const data = await res.json();
-              if (data && data.buildId) {
-                // Baseline initialization on first check
-                if (!currentBuildId.value) {
-                  const storedInitial = sessionStorage.getItem('homeaura_initial_build_id');
-                  if (storedInitial) {
-                    currentBuildId.value = storedInitial;
-                  } else {
-                    currentBuildId.value = data.buildId;
-                    sessionStorage.setItem('homeaura_initial_build_id', data.buildId);
-                  }
-                }
-
-                latestServerVersion.value = data.version || CURRENT_APP_VERSION;
-                latestServerBuildId.value = data.buildId;
-
-                // Compare buildId or version
-                const isNewer = (currentBuildId.value && data.buildId !== currentBuildId.value) || 
-                                (data.version && data.version !== currentAppVersion.value);
-                if (isNewer) {
-                  isUpdateAvailable.value = true;
-                  showUpdatePrompt.value = true;
-                  if (isManual) {
-                    updateCheckStatusText.value = `🚀 New version available (${data.version || 'Latest'})!`;
-                  }
-                } else {
-                  isUpdateAvailable.value = false;
-                  if (isManual) {
-                    updateCheckStatusText.value = `✅ You are using the latest version (v${CURRENT_APP_VERSION})`;
-                    setTimeout(() => { updateCheckStatusText.value = ''; }, 5000);
-                  }
-                }
-              }
-            }
-          } catch (err) {
-            console.warn('[Version Check Notice]:', err.message);
-            if (isManual) {
-              updateCheckStatusText.value = '⚠️ Could not verify updates (network offline or busy).';
-              setTimeout(() => { updateCheckStatusText.value = ''; }, 4000);
-            }
-          } finally {
-            isCheckingUpdate.value = false;
-          }
-        };
-
-        const reloadForUpdate = async () => {
-          if (isReloadingForUpdate.value) return;
-          isReloadingForUpdate.value = true;
-          try {
-            // If there are pending unpushed changes, save and push them to Google Sheets first
-            if (pendingSyncCount.value > 0) {
-              syncNotice.value = '💾 Saving your unsynced changes to Google Sheets before reload...';
-              try {
-                await pushToGoogleSheets(false);
-              } catch (e) {
-                console.warn('[Update Reload] Pre-reload push warning:', e);
-              }
-            }
-            sessionStorage.removeItem('homeaura_initial_build_id');
-          } catch (e) {
-            console.warn('[Update Reload Error]', e);
-          } finally {
-            // Force hard reload bypassing cache
-            const cleanUrl = window.location.origin + window.location.pathname + '?_v=' + Date.now() + window.location.hash;
-            window.location.replace(cleanUrl);
-          }
-        };
-
-        const dismissUpdatePrompt = () => {
-          showUpdatePrompt.value = false;
-        };
-
-        const openUpdatePrompt = () => {
-          showUpdatePrompt.value = true;
-        };
-
-        /* ============================================================================
- * [APP-SEGMENT 41/45]: GOOGLE APPS SCRIPT V4 BACKEND CODE GENERATOR & COPY
- * Responsibilities: Generates AppsScript.js source code for Google Sheets deployment
- * Diagnostic Focus: Script code templating, clipboard copy reliability
- * ============================================================================ */
+        // --- APPS SCRIPT V4 MODAL & COPY ---
         const openAppsScriptModal = () => {
           activeModal.value = 'appsScriptModal';
         };
@@ -7822,16 +7358,8 @@ function mergeObjectsByIdLWW(sheetName, incomingObjects) {
         map[key] = Object.assign({}, existing, incObj);
         updatedCount++;
       } else {
-        var modified = false;
         if (incObj.factoryTag && !existing.factoryTag) {
           existing.factoryTag = incObj.factoryTag;
-          modified = true;
-        }
-        if (incObj.combinedDriveUrl && !existing.combinedDriveUrl) {
-          existing.combinedDriveUrl = incObj.combinedDriveUrl;
-          modified = true;
-        }
-        if (modified) {
           map[key] = existing;
           updatedCount++;
         }
@@ -7892,11 +7420,6 @@ function objectsToSheetAtomic(sheetName, objects) {
   if (!sheet) sheet = ss.insertSheet(sheetName);
   if (!objects || objects.length === 0) { sheet.clearContents(); return; }
   var headersMap = {};
-  if (sheetName === 'orders' || sheetName === 'deletedOrders') {
-    headersMap['sfcDeliveryStatus'] = true;
-    headersMap['factoryTag'] = true;
-    headersMap['combinedDriveUrl'] = true;
-  }
   objects.forEach(function(obj) {
     if (typeof obj === 'object' && obj !== null) {
       Object.keys(obj).forEach(function(key) { headersMap[key] = true; });
@@ -8052,11 +7575,7 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           }
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 42/45]: SNAPSHOT BACKUP IMPORT / EXPORT VAULT
- * Responsibilities: Full JSON snapshot backup creation, snapshot restoration
- * Diagnostic Focus: Schema validation, corrupted snapshot safeguards
- * ============================================================================ */
+        // --- SNAPSHOT BACKUP IMPORT / EXPORT ---
         const exportSnapshot = () => {
           const password = prompt('Enter a password to encrypt this backup file (leave blank for no encryption):');
           const snapshot = {
@@ -8157,11 +7676,7 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           reader.readAsText(file);
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 43/45]: USER PROFILE & TEAM MEMBER MANAGEMENT
- * Responsibilities: Add user, edit user role/credentials, deactivate user
- * Diagnostic Focus: Unique username enforcement, password hashing/storage
- * ============================================================================ */
+        // --- USER PROFILE MANAGEMENT ---
         const openAddUserModal = () => {
           modalData.title = 'Register New User Profile';
           modalData.user = reactive({ name: '', username: '', password: '1234', role: 'seller', active: true, target: 300000, dailyTarget: 10000, visibleSellers: [], pagePrefix: '' });
@@ -8224,11 +7739,7 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           modalData.expense = null;
         };
 
-        /* ============================================================================
- * [APP-SEGMENT 44/45]: DASHBOARD INTERACTIVE CHARTS (CHART.JS)
- * Responsibilities: Canvas chart lifecycle, sales trends, factory distribution
- * Diagnostic Focus: Chart instance destruction before recreation, canvas resize
- * ============================================================================ */
+        // --- DASHBOARD CHARTS ---
         let chartInstance = null;
         let pieChartInstance = null;
 
@@ -8476,11 +7987,7 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           }
         });
 
-        /* ============================================================================
- * [APP-SEGMENT 45/45]: LIFECYCLE, AUTO-POLLING ENGINE & RUNTIME DIAGNOSTIC EXPORT
- * Responsibilities: onMounted hook, periodic auto-sync, keyboard shortcuts, devtools diagnostic
- * Diagnostic Focus: Interval cleanup, memory leak prevention, initial fetch
- * ============================================================================ */
+        // --- LIFECYCLE & POLLING ENGINE ---
         onMounted(() => {
           applyDarkMode();
           loadInitialData();
@@ -8512,23 +8019,10 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
             syncFromGoogleSheets().finally(() => { isInitialLoad.value = false; });
           }, 4000);
 
-          // Initial app update baseline check
-          setTimeout(() => {
-            checkForAppUpdates(false);
-          }, 2500);
-
-          // Periodic update check every 60 seconds
-          let updateCheckInterval = setInterval(() => {
-            if (!document.hidden && navigator.onLine) {
-              checkForAppUpdates(false);
-            }
-          }, 60000);
-
           // Visibility change listener
           document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
               syncFromGoogleSheets().finally(() => { isInitialLoad.value = false; });
-              checkForAppUpdates(false);
             }
           });
 
@@ -8536,7 +8030,6 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           window.addEventListener('focus', () => {
             if (navigator.onLine) {
               syncFromGoogleSheets().finally(() => { isInitialLoad.value = false; });
-              checkForAppUpdates(false);
             }
           });
 
@@ -8936,20 +8429,6 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           resetFavicon,
           openFraudDetailModal,
           refreshModalFraudCheck,
-          CURRENT_APP_VERSION,
-          currentAppVersion,
-          currentBuildId,
-          latestServerVersion,
-          latestServerBuildId,
-          isUpdateAvailable,
-          isCheckingUpdate,
-          showUpdatePrompt,
-          updateCheckStatusText,
-          isReloadingForUpdate,
-          checkForAppUpdates,
-          reloadForUpdate,
-          dismissUpdatePrompt,
-          openUpdatePrompt,
         };
       } catch (e) {
     document.body.innerHTML += '<div style="color:red; background:white; position:fixed; top:50px; left:0; z-index:9999; padding: 20px;">APP.JS ERROR: ' + e.message + '<br>' + e.stack + '</div>';

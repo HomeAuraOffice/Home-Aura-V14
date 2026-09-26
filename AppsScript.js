@@ -297,9 +297,7 @@ function doPost(e) {
       logHistory(payloadObj, stats);
 
       try {
-        if ((changes.orders && changes.orders.length > 0) || (deletes.orders && deletes.orders.length > 0)) {
-          distributeOrdersBySeller();
-        }
+        distributeOrdersBySeller();
       } catch(e) {}
 
       var lastUpdateDelta = recordRecentChanges(changes, deletes, payloadObj.sender);
@@ -445,10 +443,6 @@ function mergeObjectsByIdLWW(sheetName, incomingObjects) {
           existing.sfcDeliveryStatus = incObj.sfcDeliveryStatus;
           modified = true;
         }
-        if (incObj.combinedDriveUrl && !existing.combinedDriveUrl) {
-          existing.combinedDriveUrl = incObj.combinedDriveUrl;
-          modified = true;
-        }
         if (modified) {
           map[key] = existing;
           updatedCount++;
@@ -556,7 +550,6 @@ function objectsToSheetAtomic(sheetName, objects) {
   if (sheetName === 'orders' || sheetName === 'deletedOrders') {
     headersMap['sfcDeliveryStatus'] = true;
     headersMap['factoryTag'] = true;
-    headersMap['combinedDriveUrl'] = true;
   }
   objects.forEach(function(obj) {
     if (typeof obj === 'object' && obj !== null) {
