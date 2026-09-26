@@ -5615,7 +5615,7 @@ DIAGNOSTIC VIEW SEGMENT INDEX (19 SEGMENTS):
                         </p>
                       </div>
 
-                      <div class="flex flex-wrap items-center gap-2">
+                      <div class="flex items-center gap-2">
                         <button
                           type="button"
                           @click="checkForAppUpdates(true)"
@@ -5625,16 +5625,6 @@ DIAGNOSTIC VIEW SEGMENT INDEX (19 SEGMENTS):
                           <span v-if="isCheckingUpdate" class="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
                           <span v-else>🔍</span>
                           <span>Check for Updates</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          @click="simulateNewVersionAvailable('4.3.1 (Demo)')"
-                          class="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                          title="Simulate a new version alert to see the reload popup"
-                        >
-                          <span>🧪</span>
-                          <span>Demo Update Popup</span>
                         </button>
 
                         <button

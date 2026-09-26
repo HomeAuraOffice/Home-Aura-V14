@@ -7645,14 +7645,6 @@ Pushing to Google Sheets so all sellers sync this link automatically.`);
           showUpdatePrompt.value = true;
         };
 
-        const simulateNewVersionAvailable = (demoVersion = '4.3.1') => {
-          latestServerVersion.value = demoVersion;
-          latestServerBuildId.value = 'v' + demoVersion + '-' + Date.now();
-          isUpdateAvailable.value = true;
-          showUpdatePrompt.value = true;
-          updateCheckStatusText.value = `🚀 New version available (${demoVersion})!`;
-        };
-
         /* ============================================================================
  * [APP-SEGMENT 41/45]: GOOGLE APPS SCRIPT V4 BACKEND CODE GENERATOR & COPY
  * Responsibilities: Generates AppsScript.js source code for Google Sheets deployment
@@ -8958,7 +8950,6 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           reloadForUpdate,
           dismissUpdatePrompt,
           openUpdatePrompt,
-          simulateNewVersionAvailable,
         };
       } catch (e) {
     document.body.innerHTML += '<div style="color:red; background:white; position:fixed; top:50px; left:0; z-index:9999; padding: 20px;">APP.JS ERROR: ' + e.message + '<br>' + e.stack + '</div>';
