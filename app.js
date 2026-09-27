@@ -2614,27 +2614,50 @@
         const clipboardRawText = ref('');
         const parseSuccessMsg = ref('');
         const missingFieldsHighlight = ref(false);
+        const getNextAvailableOrderNum = () => {
+          const takenNumbers = new Set();
+          const takenIds = new Set();
+          const customPrefix = (currentUser.value && currentUser.value.pagePrefix && currentUser.value.pagePrefix.trim() !== '')
+            ? currentUser.value.pagePrefix.trim().toUpperCase()
+            : 'ORD';
+          const prefixLower = customPrefix.toLowerCase();
+
+          const scanOrder = (o) => {
+            if (!o || !o.id) return;
+            const idStr = String(o.id).trim();
+            if (idStr) takenIds.add(idStr.toLowerCase());
+
+            // Extract numeric sequence from id, e.g. "ORD-1005" -> 1005, "1005" -> 1005
+            const m = idStr.match(/-(\d+)/i);
+            if (m) {
+              const num = parseInt(m[1], 10);
+              if (!isNaN(num) && num > 0) takenNumbers.add(num);
+            } else {
+              const digits = idStr.match(/\d+/g);
+              if (digits && digits.length > 0) {
+                const num = parseInt(digits[digits.length - 1], 10);
+                if (!isNaN(num) && num > 0) takenNumbers.add(num);
+              }
+            }
+          };
+
+          (orders.value || []).forEach(scanOrder);
+          (deletedOrders.value || []).forEach(scanOrder);
+
+          // Find lowest available integer starting from 1001 to reuse missing numbers and fill gaps
+          let candidate = 1001;
+          while (
+            takenNumbers.has(candidate) ||
+            takenIds.has(`${prefixLower}-${candidate}`) ||
+            takenIds.has(String(candidate))
+          ) {
+            candidate++;
+          }
+          return candidate;
+        };
+
         const nextUpcomingOrderNum = computed(() => {
-          let maxNum = 1000;
-          orders.value.forEach(o => {
-            if (o && o.id) {
-              const m = String(o.id).match(/-(\d+)/i);
-              if (m) {
-                const num = parseInt(m[1], 10);
-                if (!isNaN(num) && num > maxNum) maxNum = num;
-              }
-            }
-          });
-          deletedOrders.value.forEach(o => {
-            if (o && o.id) {
-              const m = String(o.id).match(/-(\d+)/i);
-              if (m) {
-                const num = parseInt(m[1], 10);
-                if (!isNaN(num) && num > maxNum) maxNum = num;
-              }
-            }
-          });
-          return maxNum + 1;
+          return getNextAvailableOrderNum();
         });
 
         const nextUpcomingOrderId = computed(() => {
@@ -6742,12 +6765,120 @@ const executeBulkFactoryDispatch = async () => {
         };
 
         // --- ORDER EDITING ---
+        const editOrderIdInput = ref('');
+        const editOrderIdTarget = ref(null);
+        const isSavingOrderId = ref(false);
+
+        const openEditOrderIdModal = (order) => {
+          if (!order) return;
+          if (currentUser.value?.role !== 'admin' && currentUser.value?.role !== 'moderator') {
+            alert('⚠️ Only Admins and Moderators have permission to edit Order IDs.');
+            return;
+          }
+          const target = orders.value.find(o => o.id === order.id) || order;
+          editOrderIdTarget.value = target;
+          editOrderIdInput.value = target.id;
+          modalData.title = `Edit Order ID: #${target.id}`;
+          modalData.oldOrderId = target.id;
+          activeModal.value = 'editOrderIdModal';
+        };
+
+        const saveNewOrderId = async () => {
+          if (!editOrderIdTarget.value) return;
+          const oldId = String(modalData.oldOrderId || editOrderIdTarget.value.id || '').trim();
+          const newId = String(editOrderIdInput.value || '').trim();
+
+          if (!newId) {
+            alert('⚠️ Order ID cannot be blank. Please enter a valid Order ID.');
+            return;
+          }
+
+          if (newId === oldId) {
+            closeModal();
+            return;
+          }
+
+          const existing = orders.value.find(o => o.id === newId && o.id !== oldId);
+          if (existing) {
+            alert(`⚠️ An order with ID "${newId}" already exists. Please choose a unique Order ID.`);
+            return;
+          }
+
+          isSavingOrderId.value = true;
+          try {
+            const idx = orders.value.findIndex(o => o.id === oldId);
+            if (idx === -1) {
+              alert('⚠️ Order not found in master records.');
+              return;
+            }
+
+            const targetOrder = { ...orders.value[idx] };
+            targetOrder.id = newId;
+            targetOrder.updatedAt = getBstIsoString();
+            targetOrder.updatedBy = currentUser.value?.username || 'admin';
+
+            // 1. Delete old ID from Google Sheets
+            queueDelete('orders', oldId);
+
+            // 2. Put new order with new ID into state and queue
+            orders.value[idx] = targetOrder;
+            queueChange('orders', targetOrder);
+
+            // 3. Migrate local references
+            if (selectedOrders.value && selectedOrders.value.has && selectedOrders.value.has(oldId)) {
+              selectedOrders.value.delete(oldId);
+              selectedOrders.value.add(newId);
+            }
+            if (sfcDeliveryStatuses.value && sfcDeliveryStatuses.value[oldId]) {
+              sfcDeliveryStatuses.value[newId] = sfcDeliveryStatuses.value[oldId];
+              delete sfcDeliveryStatuses.value[oldId];
+            }
+            if (fraudCheckMap.value && fraudCheckMap.value[oldId]) {
+              fraudCheckMap.value[newId] = fraudCheckMap.value[oldId];
+              delete fraudCheckMap.value[oldId];
+            }
+            if (trackingData.value && typeof trackingData.value === 'object' && trackingData.value[oldId]) {
+              trackingData.value[newId] = trackingData.value[oldId];
+              delete trackingData.value[oldId];
+            }
+            if (isGeneratingCombinedMap.value && isGeneratingCombinedMap.value[oldId] !== undefined) {
+              isGeneratingCombinedMap.value[newId] = isGeneratingCombinedMap.value[oldId];
+              delete isGeneratingCombinedMap.value[oldId];
+            }
+            if (factoryBills.value && Array.isArray(factoryBills.value)) {
+              factoryBills.value.forEach(b => {
+                if (b.linkedOrderIds && Array.isArray(b.linkedOrderIds) && b.linkedOrderIds.includes(oldId)) {
+                  b.linkedOrderIds = b.linkedOrderIds.map(oid => oid === oldId ? newId : oid);
+                  queueChange('factoryBills', b);
+                }
+              });
+            }
+
+            saveOrdersLocally();
+            saveSyncQueue();
+            triggerAutoSync(true);
+
+            // 4. Update Combined Photo for new ID
+            updateOrderCombinedPhoto(targetOrder.id, true);
+
+            syncNotice.value = `✅ Order ID changed from #${oldId} to #${newId} & updated in Google Sheets!`;
+            setTimeout(() => { syncNotice.value = ''; }, 5000);
+            closeModal();
+          } catch (err) {
+            console.error('Failed to change Order ID:', err);
+            alert('⚠️ Failed to change Order ID: ' + err.message);
+          } finally {
+            isSavingOrderId.value = false;
+          }
+        };
+
         const openEditOrderModal = (order) => {
           if (currentUser.value?.role === 'seller' && order.merchantName !== currentUser.value?.name && order.merchantId !== currentUser.value?.id) {
             alert("⚠️ Security restriction: You cannot edit orders assigned to other merchants/sellers.");
             return;
           }
           modalData.title = `Edit Order: ${order.id}`;
+          modalData.oldOrderId = order.id;
           const initialDelivery = (order.deliveryCharge !== undefined && order.deliveryCharge !== null && !isNaN(Number(order.deliveryCharge))) ? Number(order.deliveryCharge) : 0;
           const initialTotal = (order.totalAmount !== undefined && order.totalAmount !== null && !isNaN(Number(order.totalAmount))) ? Number(order.totalAmount) : 0;
           const initialSale = (order.saleAmount !== undefined && order.saleAmount !== null && !isNaN(Number(order.saleAmount))) ? Number(order.saleAmount) : Math.max(0, initialTotal - initialDelivery);
@@ -6795,8 +6926,52 @@ const executeBulkFactoryDispatch = async () => {
         };
 
         const saveEditedOrder = () => {
-          const idx = orders.value.findIndex(o => o.id === modalData.order.id);
+          const lookupId = modalData.oldOrderId || modalData.order.id;
+          const idx = orders.value.findIndex(o => o.id === lookupId);
           if (idx !== -1) {
+            const oldId = orders.value[idx].id;
+            const newId = String(modalData.order.id || '').trim();
+
+            if (newId && newId !== oldId && (currentUser.value?.role === 'admin' || currentUser.value?.role === 'moderator')) {
+              const duplicate = orders.value.find(o => o.id === newId && o.id !== oldId);
+              if (duplicate) {
+                alert(`⚠️ An order with ID "${newId}" already exists. Please choose a unique Order ID.`);
+                modalData.order.id = oldId;
+                return;
+              }
+              modalData.order.id = newId;
+              queueDelete('orders', oldId);
+
+              // Migrate references
+              if (selectedOrders.value && selectedOrders.value.has && selectedOrders.value.has(oldId)) {
+                selectedOrders.value.delete(oldId);
+                selectedOrders.value.add(newId);
+              }
+              if (sfcDeliveryStatuses.value && sfcDeliveryStatuses.value[oldId]) {
+                sfcDeliveryStatuses.value[newId] = sfcDeliveryStatuses.value[oldId];
+                delete sfcDeliveryStatuses.value[oldId];
+              }
+              if (fraudCheckMap.value && fraudCheckMap.value[oldId]) {
+                fraudCheckMap.value[newId] = fraudCheckMap.value[oldId];
+                delete fraudCheckMap.value[oldId];
+              }
+              if (trackingData.value && typeof trackingData.value === 'object' && trackingData.value[oldId]) {
+                trackingData.value[newId] = trackingData.value[oldId];
+                delete trackingData.value[oldId];
+              }
+              if (factoryBills.value && Array.isArray(factoryBills.value)) {
+                factoryBills.value.forEach(b => {
+                  if (b.linkedOrderIds && Array.isArray(b.linkedOrderIds) && b.linkedOrderIds.includes(oldId)) {
+                    b.linkedOrderIds = b.linkedOrderIds.map(oid => oid === oldId ? newId : oid);
+                    queueChange('factoryBills', b);
+                  }
+                });
+              }
+            } else if (newId && newId !== oldId) {
+              // Seller cannot change Order ID
+              modalData.order.id = oldId;
+            }
+
             if (currentUser.value.role === 'seller') {
               const oldStatus = orders.value[idx].status;
               const newStatus = modalData.order.status;
@@ -8640,6 +8815,11 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           isSavingVersion,
           openVersionModal,
           saveAppVersionToSheet,
+          editOrderIdInput,
+          editOrderIdTarget,
+          isSavingOrderId,
+          openEditOrderIdModal,
+          saveNewOrderId,
         };
       } catch (e) {
     document.body.innerHTML += '<div style="color:red; background:white; position:fixed; top:50px; left:0; z-index:9999; padding: 20px;">APP.JS ERROR: ' + e.message + '<br>' + e.stack + '</div>';

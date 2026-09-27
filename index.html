@@ -3793,6 +3793,17 @@
                           >
                             <div class="flex items-center gap-1.5">
                               <span class="text-sm sm:text-base font-black font-mono tracking-tight text-slate-900 dark:text-white select-all">{{ ord.id }}</span>
+                              <button
+                                v-if="currentUser?.role === 'admin' || currentUser?.role === 'moderator'"
+                                @click.stop="openEditOrderIdModal(ord)"
+                                type="button"
+                                title="Edit Order ID (Admin & Moderator)"
+                                class="p-1 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-all cursor-pointer shadow-2xs"
+                              >
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                              </button>
                               <span
                                 v-if="ord.urgent"
                                 class="px-1.5 py-0.5 text-[9px] bg-rose-600 text-white rounded font-extrabold uppercase animate-pulse shrink-0"
@@ -7474,6 +7485,17 @@
                                 #{{ (myOrdersCurrentPage - 1) * myOrdersPerPage + index + 1 }}
                               </span>
                               <span class="text-sm sm:text-base font-black font-mono tracking-tight text-slate-900 dark:text-white select-all">{{ ord.id }}</span>
+                              <button
+                                v-if="currentUser?.role === 'admin' || currentUser?.role === 'moderator'"
+                                @click.stop="openEditOrderIdModal(ord)"
+                                type="button"
+                                title="Edit Order ID (Admin & Moderator)"
+                                class="p-1 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 transition-all cursor-pointer shadow-2xs"
+                              >
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                </svg>
+                              </button>
                               <span
                                 v-if="ord.urgent"
                                 class="px-1.5 py-0.5 text-[9px] bg-rose-600 text-white rounded font-extrabold uppercase animate-pulse shrink-0"
@@ -9024,6 +9046,15 @@
                           class="font-extrabold text-indigo-950 dark:text-indigo-200 text-sm"
                           >Order #{{ modalData.order.id }}</span
                         >
+                        <button
+                          v-if="currentUser?.role === 'admin' || currentUser?.role === 'moderator'"
+                          @click.stop="openEditOrderIdModal(modalData.order)"
+                          type="button"
+                          title="Edit Order ID"
+                          class="px-2 py-0.5 rounded-lg bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/60 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 font-bold text-[10px] transition-all flex items-center gap-1 cursor-pointer border border-indigo-200 dark:border-indigo-800"
+                        >
+                          <span>✏️ Edit ID</span>
+                        </button>
                         <span
                           :class="getStatusStyle(modalData.order.status)"
                           class="px-2 py-0.5 rounded text-[10px] font-extrabold border"
@@ -9374,6 +9405,52 @@
                   v-if="activeModal === 'editOrder'"
                   class="space-y-4 text-xs"
                 >
+                  <!-- Order ID Section -->
+                  <div class="p-3 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div class="flex items-center gap-1.5">
+                        <label class="block text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                          Order Reference ID
+                        </label>
+                        <span
+                          v-if="currentUser?.role === 'admin' || currentUser?.role === 'moderator'"
+                          class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300"
+                        >
+                          👑 Editable (Admin/Moderator)
+                        </span>
+                        <span
+                          v-else
+                          class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+                        >
+                          🔒 Locked
+                        </span>
+                      </div>
+                      <div class="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                        <span v-if="currentUser?.role === 'admin' || currentUser?.role === 'moderator'">
+                          Editing this ID will rename it across all devices and Google Sheets.
+                        </span>
+                        <span v-else>
+                          Only Admins and Moderators can rename Order IDs.
+                        </span>
+                      </div>
+                    </div>
+                    <div class="w-full sm:w-48 shrink-0">
+                      <input
+                        v-if="currentUser?.role === 'admin' || currentUser?.role === 'moderator'"
+                        v-model="modalData.order.id"
+                        type="text"
+                        placeholder="e.g. HA-1001"
+                        class="w-full bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 font-mono font-bold text-indigo-700 dark:text-indigo-300 p-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                      />
+                      <div
+                        v-else
+                        class="w-full bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-700 dark:text-slate-300 p-2 rounded-xl text-xs text-center"
+                      >
+                        {{ modalData.order.id }}
+                      </div>
+                    </div>
+                  </div>
+
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label
@@ -11292,6 +11369,68 @@
                       :class="modalData.confirmButtonClass"
                     >
                       {{ modalData.confirmButtonText }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- EDIT ORDER ID MODAL (ADMIN & MODERATOR) -->
+                <div
+                  v-if="activeModal === 'editOrderIdModal'"
+                  class="space-y-4 text-xs"
+                >
+                  <div class="bg-indigo-50/80 dark:bg-indigo-950/60 p-4 rounded-2xl border border-indigo-200 dark:border-indigo-800 space-y-2">
+                    <div class="font-extrabold text-indigo-950 dark:text-indigo-200 text-sm flex items-center gap-2">
+                      <span>🏷️ Rename / Edit Order ID</span>
+                      <span class="px-2 py-0.5 rounded text-[9px] font-bold bg-indigo-200 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300">
+                        Admin & Moderator
+                      </span>
+                    </div>
+                    <p class="text-[11px] text-indigo-700 dark:text-indigo-300 leading-relaxed">
+                      Changing the Order ID will update the record across all devices, rename the entry in Google Sheets, and refresh the composite dispatch photo.
+                    </p>
+                  </div>
+
+                  <div class="space-y-3">
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                      <span class="text-slate-500 dark:text-slate-400 font-semibold text-[11px]">Current Order ID:</span>
+                      <span class="font-mono font-black text-slate-900 dark:text-white text-sm">#{{ modalData.oldOrderId }}</span>
+                    </div>
+
+                    <div>
+                      <label class="block text-[10px] font-extrabold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                        New Order ID
+                      </label>
+                      <input
+                        v-model="editOrderIdInput"
+                        type="text"
+                        placeholder="e.g. HA-1002"
+                        class="w-full bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 font-mono font-bold text-slate-900 dark:text-slate-100 p-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+                        @keydown.enter.prevent="saveNewOrderId"
+                      />
+                    </div>
+
+                    <div v-if="editOrderIdTarget" class="p-3 bg-slate-50/50 dark:bg-slate-800/30 rounded-xl text-[10px] text-slate-500 space-y-0.5">
+                      <div>👤 Customer: <strong>{{ editOrderIdTarget.customerName || 'N/A' }}</strong></div>
+                      <div>🛋️ Product: {{ editOrderIdTarget.productCategory || 'N/A' }} ({{ editOrderIdTarget.seatConfig || 'N/A' }})</div>
+                    </div>
+                  </div>
+
+                  <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <button
+                      @click="closeModal"
+                      type="button"
+                      class="px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-all text-xs cursor-pointer"
+                    >
+                      ✕ Cancel
+                    </button>
+                    <button
+                      @click="saveNewOrderId"
+                      :disabled="isSavingOrderId || !editOrderIdInput || editOrderIdInput.trim() === modalData.oldOrderId"
+                      type="button"
+                      class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span v-if="isSavingOrderId" class="animate-spin">⏳</span>
+                      <span>Update Order ID & Push to Sheet</span>
                     </button>
                   </div>
                 </div>
