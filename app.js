@@ -2614,50 +2614,27 @@
         const clipboardRawText = ref('');
         const parseSuccessMsg = ref('');
         const missingFieldsHighlight = ref(false);
-        const getNextAvailableOrderNum = () => {
-          const takenNumbers = new Set();
-          const takenIds = new Set();
-          const customPrefix = (currentUser.value && currentUser.value.pagePrefix && currentUser.value.pagePrefix.trim() !== '')
-            ? currentUser.value.pagePrefix.trim().toUpperCase()
-            : 'ORD';
-          const prefixLower = customPrefix.toLowerCase();
-
-          const scanOrder = (o) => {
-            if (!o || !o.id) return;
-            const idStr = String(o.id).trim();
-            if (idStr) takenIds.add(idStr.toLowerCase());
-
-            // Extract numeric sequence from id, e.g. "ORD-1005" -> 1005, "1005" -> 1005
-            const m = idStr.match(/-(\d+)/i);
-            if (m) {
-              const num = parseInt(m[1], 10);
-              if (!isNaN(num) && num > 0) takenNumbers.add(num);
-            } else {
-              const digits = idStr.match(/\d+/g);
-              if (digits && digits.length > 0) {
-                const num = parseInt(digits[digits.length - 1], 10);
-                if (!isNaN(num) && num > 0) takenNumbers.add(num);
+        const nextUpcomingOrderNum = computed(() => {
+          let maxNum = 1000;
+          orders.value.forEach(o => {
+            if (o && o.id) {
+              const m = String(o.id).match(/-(\d+)/i);
+              if (m) {
+                const num = parseInt(m[1], 10);
+                if (!isNaN(num) && num > maxNum) maxNum = num;
               }
             }
-          };
-
-          (orders.value || []).forEach(scanOrder);
-          (deletedOrders.value || []).forEach(scanOrder);
-
-          // Find lowest available integer starting from 1001 to reuse missing numbers and fill gaps
-          let candidate = 1001;
-          while (
-            takenNumbers.has(candidate) ||
-            takenIds.has(`${prefixLower}-${candidate}`) ||
-            takenIds.has(String(candidate))
-          ) {
-            candidate++;
-          }
-          return candidate;
-        };
-
-        const nextUpcomingOrderNum = computed(() => {
-          return getNextAvailableOrderNum();
+          });
+          deletedOrders.value.forEach(o => {
+            if (o && o.id) {
+              const m = String(o.id).match(/-(\d+)/i);
+              if (m) {
+                const num = parseInt(m[1], 10);
+                if (!isNaN(num) && num > maxNum) maxNum = num;
+              }
+            }
+          });
+          return maxNum + 1;
         });
 
         const nextUpcomingOrderId = computed(() => {
