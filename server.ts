@@ -557,6 +557,67 @@ async function startServer() {
     }
   });
 
+  // --- WI-FI ATTENDANCE & LUNCH TRACKING NETWORK API ---
+  app.get('/api/attendance/network-check', (req, res) => {
+    try {
+      const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+      const now = new Date();
+      const dhakaTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' });
+      const dhakaDate = new Date(dhakaTimeStr);
+
+      const hours = dhakaDate.getHours();
+      const minutes = dhakaDate.getMinutes();
+      const isPast2Pm = hours >= 14;
+
+      res.json({
+        success: true,
+        clientIp: typeof clientIp === 'string' ? clientIp.split(',')[0].trim() : clientIp,
+        timestamp: now.toISOString(),
+        dhakaTime: dhakaTimeStr,
+        dhakaHour: hours,
+        dhakaMinute: minutes,
+        isPast2Pm: isPast2Pm,
+        officeSsid: 'Homeaura'
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/attendance/event', async (req, res) => {
+    try {
+      const { userId, username, sellerName, event, clientTimestamp, deviceInfo, notes } = req.body;
+      const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+      const now = new Date();
+      const dhakaTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' });
+      const dhakaDate = new Date(dhakaTimeStr);
+
+      const year = dhakaDate.getFullYear();
+      const month = String(dhakaDate.getMonth() + 1).padStart(2, '0');
+      const day = String(dhakaDate.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
+
+      let h = dhakaDate.getHours();
+      const m = String(dhakaDate.getMinutes()).padStart(2, '0');
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      const formattedTime = `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+
+      res.json({
+        success: true,
+        receivedEvent: event,
+        date: dateKey,
+        time: formattedTime,
+        isPast2Pm: dhakaDate.getHours() >= 14,
+        clientIp: typeof clientIp === 'string' ? clientIp.split(',')[0].trim() : clientIp,
+        deviceInfo: deviceInfo || 'Web/Mobile Client',
+        timestamp: now.toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },

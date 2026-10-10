@@ -161,7 +161,16 @@
             return isNaN(d.getTime()) ? null : d;
           }
           let str = String(input).trim();
-          if (!str) return null;
+          // Remove backslashes, enclosing single/double quotes, and whitespace
+          str = str.replace(/\\"/g, '').replace(/^["'\s]+|["'\s]+$/g, '').trim();
+          if (!str || str === 'null' || str === 'undefined' || str === 'NaN' || str === 'N/A') return null;
+
+          // If standard YYYY-MM-DD, parse anchored at midday UTC to avoid any daylight/timezone date boundary shift
+          if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+            const d = new Date(str + 'T12:00:00Z');
+            return isNaN(d.getTime()) ? null : d;
+          }
+
           if (/^\d{10,13}$/.test(str)) {
             const num = Number(str);
             const d = new Date(num > 1e11 ? num : num * 1000);
@@ -195,6 +204,10 @@
 
         const getBstDateString = (isoOrDate) => {
           if (!isoOrDate) return '';
+          if (typeof isoOrDate === 'string') {
+            const clean = String(isoOrDate).replace(/\\"/g, '').replace(/^["'\s]+|["'\s]+$/g, '').trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+          }
           const d = parseToDate(isoOrDate);
           if (!d) return '';
           try {
@@ -204,34 +217,76 @@
           }
         };
 
+        const getOrderBstDateString = (o) => {
+          if (!o) return '';
+          const candidates = [
+            o.orderDate,
+            o.timestamp,
+            o.createdAt,
+            o.date,
+            (typeof isOrderDelivered === 'function' && isOrderDelivered(o) ? o.deliveredAt : null),
+            o.updatedAt
+          ];
+          for (const c of candidates) {
+            if (c) {
+              const bst = getBstDateString(c);
+              if (bst) return bst;
+            }
+          }
+          return '';
+        };
+
+        const getEffectiveCurrentBstDate = () => {
+          const sysToday = getBstDateString(new Date());
+          try {
+            if (typeof orders !== 'undefined' && orders && orders.value && orders.value.length > 0) {
+              let latest = '';
+              for (const o of orders.value) {
+                const d = getOrderBstDateString(o);
+                if (d && (!latest || d > latest)) {
+                  latest = d;
+                }
+              }
+              if (latest) {
+                const sysYear = parseInt(sysToday.substring(0, 4), 10) || 0;
+                const latestYear = parseInt(latest.substring(0, 4), 10) || 0;
+                if (sysYear < latestYear || sysToday < latest.substring(0, 7)) {
+                  return latest;
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('[EffectiveDate Calc]', e);
+          }
+          return sysToday;
+        };
+
         const isDateInDashboardRange = (dateInput, range = null, specificDate = null, customStartDate = null, customEndDate = null) => {
           const effectiveRange = (range !== null && range !== undefined) ? range : (typeof dashboardFilter !== 'undefined' ? dashboardFilter.dateRange : 'all');
           if (!effectiveRange || effectiveRange === 'all') return true;
           if (!dateInput) return false;
           const itemBst = getBstDateString(dateInput);
           if (!itemBst) return false;
-          const nowBst = getBstDateString(new Date());
+          const nowBst = getTodayBstDateString();
           if (!nowBst) return true;
 
           if (effectiveRange === 'today') {
             return itemBst === nowBst;
           }
           if (effectiveRange === 'yesterday') {
-            const yesterdayDate = new Date(new Date(nowBst + 'T00:00:00Z').getTime() - 24 * 60 * 60 * 1000);
-            const yestBst = getBstDateString(yesterdayDate);
-            return itemBst === yestBst;
+            return itemBst === getYesterdayBstDateString();
           }
           if (effectiveRange === 'specific') {
             const target = specificDate || (typeof dashboardFilter !== 'undefined' ? dashboardFilter.specificDate : null) || nowBst;
             return itemBst === target;
           }
           if (effectiveRange === 'week') {
-            const minDate = new Date(new Date(nowBst + 'T00:00:00Z').getTime() - 7 * 24 * 60 * 60 * 1000);
-            const itemDate = new Date(itemBst + 'T12:00:00Z');
-            return itemDate >= minDate && itemBst <= nowBst;
+            const minDate = getDaysAgoBstDateString(7);
+            return itemBst >= minDate && itemBst <= nowBst;
           }
-          if (effectiveRange === 'month') {
-            return itemBst.substring(0, 7) === nowBst.substring(0, 7);
+          if (effectiveRange === 'month' || effectiveRange === 'this_month') {
+            const targetMonth = (typeof dashboardFilter !== 'undefined' && dashboardFilter.selectedMonth) ? dashboardFilter.selectedMonth : nowBst.substring(0, 7);
+            return itemBst.substring(0, 7) === targetMonth;
           }
           if (effectiveRange === 'custom') {
             const sDate = customStartDate || (typeof dashboardFilter !== 'undefined' ? dashboardFilter.startDate : null);
@@ -266,19 +321,21 @@
         };
 
         const getTodayBstDateString = () => {
-          return getBstDateString(new Date());
+          return getEffectiveCurrentBstDate();
         };
 
         const getYesterdayBstDateString = () => {
-          const d = new Date();
-          d.setDate(d.getDate() - 1);
-          return getBstDateString(d);
+          const today = getTodayBstDateString();
+          const d = new Date(today + 'T12:00:00Z');
+          d.setUTCDate(d.getUTCDate() - 1);
+          return d.toISOString().split('T')[0];
         };
 
         const getDaysAgoBstDateString = (days = 2) => {
-          const d = new Date();
-          d.setDate(d.getDate() - days);
-          return getBstDateString(d);
+          const today = getTodayBstDateString();
+          const d = new Date(today + 'T12:00:00Z');
+          d.setUTCDate(d.getUTCDate() - days);
+          return d.toISOString().split('T')[0];
         };
 
         const formatDisplayDateOnly = (isoOrDate) => {
@@ -1087,7 +1144,8 @@
             editOrder(ord);
           } else {
             activeTab.value = (currentUser.value?.role === 'admin' || currentUser.value?.role === 'moderator' || currentUser.value?.role === 'marketer') ? 'dashboard' : 'myOrders';
-            orderSearch.value = task.orderNumber || task.orderId;
+            orderSearchInput.value = task.orderNumber || task.orderId;
+            orderSearch.value = orderSearchInput.value;
           }
         };
 
@@ -2601,14 +2659,35 @@
         const loginForm = reactive({ username: '', password: '' });
         const loginError = ref('');
 
-        // Filtering
+        // Filtering & Master Ledger Search / Range
+        const orderSearchInput = ref('');
         const orderSearch = ref('');
+        const ledgerDateRange = ref('ALL'); // 'ALL', 'TODAY', 'YESTERDAY', '7DAYS', 'THIS_MONTH', 'CUSTOM'
+        const ledgerStartDate = ref('');
+        const ledgerEndDate = ref('');
         const sortOption = ref('NEWEST');
         const statusFilter = ref('ALL');
         const merchantFilter = ref('ALL');
         const factoryFilter = ref('ALL');
         const urgentOnly = ref(false);
         const newCategoryName = ref('');
+
+        const applyOrderSearch = () => {
+          orderSearch.value = (orderSearchInput.value || '').trim();
+          orderCurrentPage.value = 1;
+        };
+
+        const clearOrderSearch = () => {
+          orderSearchInput.value = '';
+          orderSearch.value = '';
+          orderCurrentPage.value = 1;
+        };
+
+        watch(orderSearchInput, (newVal) => {
+          if (!newVal || !newVal.trim()) {
+            orderSearch.value = '';
+          }
+        });
 
         // Intake Form
         const clipboardRawText = ref('');
@@ -3607,10 +3686,39 @@
         
         const dashboardFilter = reactive({
           dateRange: 'all', // 'all', 'today', 'yesterday', 'specific', 'week', 'month', 'custom'
+          selectedMonth: getTodayBstDateString().substring(0, 7),
           specificDate: getTodayBstDateString(),
           startDate: getDaysAgoBstDateString(7),
           endDate: getTodayBstDateString(),
           sellerId: 'all'
+        });
+
+        const availableDashboardMonths = computed(() => {
+          const monthMap = {};
+          (orders.value || []).forEach(o => {
+            const bst = getOrderBstDateString(o);
+            if (bst && bst.length >= 7) {
+              const ym = bst.substring(0, 7);
+              monthMap[ym] = (monthMap[ym] || 0) + 1;
+            }
+          });
+          const curMonth = getTodayBstDateString().substring(0, 7);
+          if (!monthMap[curMonth]) {
+            monthMap[curMonth] = 0;
+          }
+          const sorted = Object.keys(monthMap).sort((a, b) => b.localeCompare(a));
+          return sorted.map(ym => {
+            const parts = ym.split('-');
+            const y = parts[0];
+            const m = parseInt(parts[1], 10) - 1;
+            const d = new Date(Date.UTC(parseInt(y, 10), m, 1));
+            const monthName = d.toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
+            const count = monthMap[ym] || 0;
+            return {
+              value: ym,
+              label: `${monthName} ${y} (${count} orders)`
+            };
+          });
         });
 
         const setDashboardDateRangePreset = (preset) => {
@@ -3625,8 +3733,11 @@
             if (!dashboardFilter.specificDate) dashboardFilter.specificDate = getTodayBstDateString();
           } else if (preset === 'week') {
             dashboardFilter.dateRange = 'week';
-          } else if (preset === 'month') {
+          } else if (preset === 'month' || preset === 'this_month') {
             dashboardFilter.dateRange = 'month';
+            if (!dashboardFilter.selectedMonth) {
+              dashboardFilter.selectedMonth = getTodayBstDateString().substring(0, 7);
+            }
           } else if (preset === 'all') {
             dashboardFilter.dateRange = 'all';
           }
@@ -3692,9 +3803,9 @@
               }
             }
             
-            // Apply date filter (prioritize orderDate/timestamp/createdAt so backdated orders are placed on their logged date)
+            // Apply date filter (prioritize normalized BST order date from orderDate, timestamp, createdAt)
             if (dashboardFilter.dateRange !== 'all') {
-              const primaryDate = o.orderDate || o.timestamp || o.createdAt || o.date || (isOrderDelivered(o) && o.deliveredAt) || o.updatedAt;
+              const primaryDate = getOrderBstDateString(o);
               if (primaryDate) {
                 if (!isDateInDashboardRange(primaryDate, dashboardFilter.dateRange, dashboardFilter.specificDate, dashboardFilter.startDate, dashboardFilter.endDate)) return false;
               } else {
@@ -3972,8 +4083,11 @@
 
         const dashboardMarketingSpend = computed(() => {
           let spends = marketingSpends.value || [];
+          if (dashboardFilter.sellerId !== 'all') {
+            spends = spends.filter(s => String(s.sellerId).trim() === String(dashboardFilter.sellerId).trim());
+          }
           if (dashboardFilter.dateRange !== 'all') {
-            spends = spends.filter(s => isDateInDashboardRange(s.date || s.createdAt, dashboardFilter.dateRange));
+            spends = spends.filter(s => isDateInDashboardRange(s.date || s.createdAt, dashboardFilter.dateRange, dashboardFilter.specificDate, dashboardFilter.startDate, dashboardFilter.endDate));
           }
           return spends.reduce((sum, s) => sum + cleanNumber(s.amount), 0);
         });
@@ -4063,7 +4177,7 @@
 
           baseOrders.forEach(o => {
             if (!o) return;
-            const orderDateStr = o.orderDate || getBstDateString(o.timestamp) || getBstDateString(o.createdAt) || getBstDateString(o.date);
+            const orderDateStr = getOrderBstDateString(o);
             if (!orderDateStr) return;
 
             if (!dailyMap[orderDateStr]) {
@@ -4087,7 +4201,7 @@
             const isCancelled = isOrderCancelled(o) || o.status === 'Returned Received';
             const isDelivered = isOrderDelivered(o);
 
-            if (o.isBackdated || (o.orderDate && o.orderDate !== getBstDateString(o.createdAt || o.updatedAt))) {
+            if (o.isBackdated || (getOrderBstDateString(o) !== getBstDateString(o.createdAt || o.updatedAt))) {
               dayObj.backdatedOrdersCount += 1;
             }
 
@@ -4198,7 +4312,7 @@
           } else if (dateWiseBreakdownFilter.value === '30days') {
             const minDate = getDaysAgoBstDateString(30);
             list = list.filter(d => d.date >= minDate && d.date <= nowBst);
-          } else if (dateWiseBreakdownFilter.value === 'this_month') {
+          } else if (dateWiseBreakdownFilter.value === 'this_month' || dateWiseBreakdownFilter.value === 'month') {
             const curMonth = nowBst.substring(0, 7);
             list = list.filter(d => d.date.substring(0, 7) === curMonth);
           }
@@ -4271,7 +4385,7 @@
               const matchesSeller = (mId && mId === sId) || (mName && (mName === sName || mName === sUser));
               if (!matchesSeller) return false;
 
-              const oDate = o.orderDate || getBstDateString(o.timestamp) || getBstDateString(o.createdAt) || getBstDateString(o.date);
+              const oDate = getOrderBstDateString(o);
               return oDate === targetDate;
             });
 
@@ -4437,8 +4551,147 @@
           return target > 0 ? Math.round((myMonthlySales.value / target) * 100) : 0;
         });
 
+        const matchOrderSearch = (o, query) => {
+          if (!o) return false;
+          if (!query || !query.trim()) return true;
+          const q = query.trim().toLowerCase();
+          const qDigits = q.replace(/\D/g, '');
+
+          const id = String(o.id || '').toLowerCase();
+          if (id.includes(q)) return true;
+
+          const name = String(o.customerName || '').toLowerCase();
+          if (name.includes(q)) return true;
+
+          const phone = String(o.customerPhone || '');
+          const phoneDigits = phone.replace(/\D/g, '');
+          if (phone.toLowerCase().includes(q)) return true;
+          if (qDigits && qDigits.length >= 3 && (phoneDigits.includes(qDigits) || qDigits.includes(phoneDigits))) return true;
+
+          const cn = String(o.cnNumber || '').toLowerCase();
+          if (cn.includes(q)) return true;
+
+          const merchant = String(o.merchantName || '').toLowerCase();
+          if (merchant.includes(q)) return true;
+
+          const fabric = String(o.fabric || '').toLowerCase();
+          if (fabric.includes(q)) return true;
+
+          const category = String(o.productCategory || '').toLowerCase();
+          if (category.includes(q)) return true;
+
+          const seat = String(o.seatConfig || '').toLowerCase();
+          if (seat.includes(q)) return true;
+
+          const addr = String(o.customerAddress || '').toLowerCase();
+          if (addr.includes(q)) return true;
+
+          const notes = String(o.notes || '').toLowerCase();
+          if (notes.includes(q)) return true;
+
+          const tag = String(o.factoryTag || '').toLowerCase();
+          if (tag.includes(q)) return true;
+
+          const status = String(o.status || '').toLowerCase();
+          if (status.includes(q)) return true;
+
+          return false;
+        };
+
+        const isDateInLedgerRange = (dateStr, range, customStart, customEnd) => {
+          if (!range || range === 'ALL') return true;
+          if (!dateStr) return false;
+          const itemBst = getBstDateString(dateStr);
+          if (!itemBst) return false;
+          const nowBst = getTodayBstDateString();
+
+          if (range === 'TODAY') {
+            return itemBst === nowBst;
+          }
+          if (range === 'YESTERDAY') {
+            return itemBst === getYesterdayBstDateString();
+          }
+          if (range === '7DAYS') {
+            const minDate = getDaysAgoBstDateString(7);
+            return itemBst >= minDate && itemBst <= nowBst;
+          }
+          if (range === 'THIS_MONTH') {
+            const targetMonth = (typeof dashboardFilter !== 'undefined' && dashboardFilter.selectedMonth) ? dashboardFilter.selectedMonth : nowBst.substring(0, 7);
+            return itemBst.substring(0, 7) === targetMonth;
+          }
+          if (range === 'CUSTOM') {
+            if (customStart && customEnd) {
+              return itemBst >= customStart && itemBst <= customEnd;
+            }
+            if (customStart) return itemBst >= customStart;
+            if (customEnd) return itemBst <= customEnd;
+            return true;
+          }
+          return true;
+        };
+
+        const sellerLedgerSalesSummary = computed(() => {
+          const isSellerSelected = merchantFilter.value !== 'ALL';
+          const isDateFiltered = ledgerDateRange.value !== 'ALL';
+
+          let targetOrders = orders.value || [];
+
+          if (isSellerSelected) {
+            const selVal = String(merchantFilter.value).trim().toLowerCase();
+            const matchedUser = (users.value || []).find(u => String(u.name || '').trim().toLowerCase() === selVal || String(u.id || '').trim().toLowerCase() === selVal || String(u.username || '').trim().toLowerCase() === selVal);
+            targetOrders = targetOrders.filter(o => {
+              const mName = String(o.merchantName || '').trim().toLowerCase();
+              const mId = String(o.merchantId || '').trim().toLowerCase();
+              return mName === selVal || mId === selVal || (matchedUser && (mName === String(matchedUser.name || '').trim().toLowerCase() || mId === String(matchedUser.id || '').trim().toLowerCase()));
+            });
+          }
+
+          if (isDateFiltered) {
+            targetOrders = targetOrders.filter(o => {
+              const oDate = getOrderBstDateString(o);
+              return oDate && isDateInLedgerRange(oDate, ledgerDateRange.value, ledgerStartDate.value, ledgerEndDate.value);
+            });
+          }
+
+          const validOrders = targetOrders.filter(o => !isOrderCancelled(o) && o.status !== 'Returned Received');
+          const deliveredOrders = targetOrders.filter(o => isOrderDelivered(o) && !isOrderCancelled(o));
+          const pendingOrders = targetOrders.filter(o => !isOrderDelivered(o) && !isOrderCancelled(o) && o.status !== 'Returned Received');
+          const cancelledOrders = targetOrders.filter(o => isOrderCancelled(o));
+
+          const totalSales = validOrders.reduce((sum, o) => sum + (cleanNumber(o.saleAmount) || getOrderTotalAmount(o)), 0);
+          const netRevenue = validOrders.reduce((sum, o) => sum + calculateNetForOrder(o), 0);
+          const deliveredSales = deliveredOrders.reduce((sum, o) => sum + (cleanNumber(o.saleAmount) || getOrderTotalAmount(o)), 0);
+
+          let dateLabel = 'All Time';
+          if (ledgerDateRange.value === 'TODAY') dateLabel = 'Today';
+          else if (ledgerDateRange.value === 'YESTERDAY') dateLabel = 'Yesterday';
+          else if (ledgerDateRange.value === '7DAYS') dateLabel = 'Past 7 Days';
+          else if (ledgerDateRange.value === 'THIS_MONTH') {
+            const ym = (typeof dashboardFilter !== 'undefined' && dashboardFilter.selectedMonth) ? dashboardFilter.selectedMonth : getTodayBstDateString().substring(0, 7);
+            dateLabel = `This Month (${ym})`;
+          } else if (ledgerDateRange.value === 'CUSTOM') {
+            dateLabel = (ledgerStartDate.value && ledgerEndDate.value) ? `${ledgerStartDate.value} → ${ledgerEndDate.value}` : (ledgerStartDate.value ? `From ${ledgerStartDate.value}` : (ledgerEndDate.value ? `Until ${ledgerEndDate.value}` : 'Custom Range'));
+          }
+
+          return {
+            sellerName: isSellerSelected ? merchantFilter.value : 'All Merchants',
+            isSellerSelected,
+            isDateFiltered,
+            dateLabel,
+            totalOrders: targetOrders.length,
+            validOrdersCount: validOrders.length,
+            deliveredCount: deliveredOrders.length,
+            pendingCount: pendingOrders.length,
+            cancelledCount: cancelledOrders.length,
+            totalSales,
+            netRevenue,
+            deliveredSales
+          };
+        });
+
         const filteredOrders = computed(() => {
           let result = orders.value.filter(o => {
+            if (!o) return false;
             if (statusFilter.value !== 'ALL') {
               if (statusFilter.value === 'Delivered') {
                 if (!isOrderDelivered(o)) return false;
@@ -4448,17 +4701,27 @@
                 return false;
               }
             }
-            if (merchantFilter.value !== 'ALL' && o.merchantName !== merchantFilter.value) return false;
+            if (merchantFilter.value !== 'ALL') {
+              const selVal = String(merchantFilter.value).trim().toLowerCase();
+              const mName = String(o.merchantName || '').trim().toLowerCase();
+              const mId = String(o.merchantId || '').trim().toLowerCase();
+              if (mName !== selVal && mId !== selVal) {
+                const matchedUser = (users.value || []).find(u => String(u.name || '').trim().toLowerCase() === selVal || String(u.id || '').trim().toLowerCase() === selVal || String(u.username || '').trim().toLowerCase() === selVal);
+                if (!matchedUser || (String(o.merchantName || '').trim().toLowerCase() !== String(matchedUser.name || '').trim().toLowerCase() && String(o.merchantId || '').trim() !== String(matchedUser.id || '').trim())) {
+                  return false;
+                }
+              }
+            }
             if (factoryFilter.value !== 'ALL' && (o.factoryTag || '') !== factoryFilter.value) return false;
             if (urgentOnly.value && !o.urgent) return false;
+            if (ledgerDateRange.value !== 'ALL') {
+              const oDate = getOrderBstDateString(o);
+              if (!oDate || !isDateInLedgerRange(oDate, ledgerDateRange.value, ledgerStartDate.value, ledgerEndDate.value)) {
+                return false;
+              }
+            }
             if (orderSearch.value) {
-              const q = orderSearch.value.toLowerCase();
-              return (
-                o.id.toLowerCase().includes(q) ||
-                o.customerName.toLowerCase().includes(q) ||
-                o.customerPhone.includes(q) ||
-                o.fabric.toLowerCase().includes(q)
-              );
+              if (!matchOrderSearch(o, orderSearch.value)) return false;
             }
             return true;
           });
@@ -4544,7 +4807,7 @@
           }
         };
 
-        watch([orderSearch, statusFilter, merchantFilter, factoryFilter, urgentOnly, sortOption, ordersPerPage], () => {
+        watch([orderSearch, statusFilter, merchantFilter, factoryFilter, urgentOnly, sortOption, ordersPerPage, ledgerDateRange, ledgerStartDate, ledgerEndDate], () => {
           orderCurrentPage.value = 1;
         });
 
@@ -8104,7 +8367,7 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           const filteredOrders = filterOrdersForDashboard(orders.value);
           const validOrders = filteredOrders.filter(o => !isOrderCancelled(o) && o.status !== 'Returned Received');
           const daysMap = {};
-          const nowBst = getBstDateString(new Date());
+          const nowBst = getTodayBstDateString();
 
           if (dashboardFilter.dateRange === 'today') {
             const todayLabel = 'Today (' + nowBst + ')';
@@ -8117,16 +8380,13 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
             const specLabel = 'Date (' + (dashboardFilter.specificDate || nowBst) + ')';
             daysMap[specLabel] = validOrders.reduce((sum, o) => sum + (cleanNumber(o.saleAmount) || getOrderTotalAmount(o)), 0);
           } else if (dashboardFilter.dateRange === 'week') {
-            const nowDate = new Date(nowBst + 'T00:00:00Z');
             for (let i = 6; i >= 0; i--) {
-              const d = new Date(nowDate.getTime() - i * 24 * 60 * 60 * 1000);
-              const dStr = d.toISOString().split('T')[0];
+              const dStr = getDaysAgoBstDateString(i);
               const displayDate = dStr.slice(5); // MM-DD
               daysMap[displayDate] = 0;
             }
             validOrders.forEach(o => {
-              const rawDate = o.timestamp || o.createdAt || o.date || o.orderDate || o.updatedAt;
-              const dateStr = getBstDateString(rawDate);
+              const dateStr = getOrderBstDateString(o);
               if (dateStr) {
                 const displayDate = dateStr.slice(5);
                 const amt = cleanNumber(o.saleAmount) || getOrderTotalAmount(o);
@@ -8137,10 +8397,29 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
                 }
               }
             });
+          } else if (dashboardFilter.dateRange === 'month' || dashboardFilter.dateRange === 'this_month') {
+            const curMonthStr = dashboardFilter.selectedMonth || nowBst.substring(0, 7);
+            const parts = curMonthStr.split('-');
+            const y = parseInt(parts[0], 10) || 2026;
+            const m = parseInt(parts[1], 10) || 10;
+            const daysInMonth = new Date(y, m, 0).getDate();
+            const isCurMonth = (curMonthStr === nowBst.substring(0, 7));
+            const maxDay = isCurMonth ? Math.min(daysInMonth, parseInt(nowBst.substring(8, 10), 10) || daysInMonth) : daysInMonth;
+            for (let i = 1; i <= maxDay; i++) {
+              const displayDate = `${curMonthStr.substring(5, 7)}-${String(i).padStart(2, '0')}`;
+              daysMap[displayDate] = 0;
+            }
+            validOrders.forEach(o => {
+              const dateStr = getOrderBstDateString(o);
+              if (dateStr && dateStr.substring(0, 7) === curMonthStr) {
+                const displayDate = dateStr.slice(5);
+                const amt = cleanNumber(o.saleAmount) || getOrderTotalAmount(o);
+                daysMap[displayDate] = (daysMap[displayDate] || 0) + amt;
+              }
+            });
           } else {
             validOrders.forEach(o => {
-              const rawDate = o.timestamp || o.createdAt || o.date || o.orderDate || o.updatedAt;
-              const dateStr = getBstDateString(rawDate);
+              const dateStr = getOrderBstDateString(o);
               if (dateStr) {
                 const label = dateStr.slice(5);
                 const amt = cleanNumber(o.saleAmount) || getOrderTotalAmount(o);
@@ -8319,7 +8598,7 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
         });
 
         // Watchers for Charts
-        watch([() => dashboardFilter.dateRange, () => dashboardFilter.specificDate, () => dashboardFilter.startDate, () => dashboardFilter.endDate, () => dashboardFilter.sellerId, activeTab, isSidebarCollapsed], () => {
+        watch([() => dashboardFilter.dateRange, () => dashboardFilter.selectedMonth, () => dashboardFilter.specificDate, () => dashboardFilter.startDate, () => dashboardFilter.endDate, () => dashboardFilter.sellerId, activeTab, isSidebarCollapsed], () => {
           if (activeTab.value === 'dashboard') {
             setTimeout(() => { // ensure DOM layout is updated
               renderChart();
@@ -8590,6 +8869,15 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           exportSnapshot,
           importSnapshot,
           orderSearch,
+          orderSearchInput,
+          applyOrderSearch,
+          clearOrderSearch,
+          ledgerDateRange,
+          ledgerStartDate,
+          ledgerEndDate,
+          sellerLedgerSalesSummary,
+          availableDashboardMonths,
+          getEffectiveCurrentBstDate,
           statusFilter,
           merchantFilter,
           factoryFilter,

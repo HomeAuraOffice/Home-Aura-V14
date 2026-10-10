@@ -767,3 +767,275 @@ function backupSpreadsheet() {
   }
   DriveApp.getFileById(ss.getId()).makeCopy(name, folder);
 }
+
+// ==============================================================================
+// HOMEAURA ATTENDANCE GOOGLE SHEET WEB APP CONNECTOR (STANDALONE SCRIPT)
+// ==============================================================================
+// STEP-BY-STEP DEPLOYMENT:
+// 1. Open your separate Google Sheet for Attendance.
+// 2. Click Extensions > Apps Script.
+// 3. Delete everything inside Code.gs and PASTE this entire script.
+// 4. Click Save (Ctrl + S or disk icon).
+// 5. Click the blue "Deploy" button at the top right > "New deployment".
+// 6. Click the gear icon (⚙️) next to "Select type" and select "Web app".
+// 7. Fill in:
+//    - Description: "Homeaura Attendance API"
+//    - Execute as: "Me" (your email)
+//    - Who has access: "Anyone"  <--- ⚠️ CRITICAL: Must be "Anyone"
+// 8. Click "Deploy", review & authorize Google permissions.
+// 9. Copy the "Web app URL" (or Deployment ID) and paste it into HomeAura!
+// ==============================================================================
+
+var ATTENDANCE_HEADERS = [
+  "id", "userId", "username", "sellerName", "date",
+  "checkInTime", "lunchStartTime", "lunchEndTime",
+  "lunchDurationMinutes", "checkOutTime", "status",
+  "lunchStatus", "totalHours", "deviceInfo", "ipAddress",
+  "source", "updatedAt", "notes"
+];
+
+function doGet(e) {
+  try {
+    var action = (e && e.parameter && e.parameter.action) || "";
+    var sheetParam = (e && e.parameter && (e.parameter.sheet || e.parameter.tab)) || "";
+
+    // 1. Connection Ping Test
+    if (action === "ping" || action === "test") {
+      return createAttendanceJsonResponse({
+        status: "success",
+        message: "Homeaura Google Apps Script Web App is connected successfully!",
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // 2. Fetch Users List
+    if (action === "getUsers" || sheetParam === "users" || action === "users") {
+      var users = getAttendanceUsersList();
+      return createAttendanceJsonResponse({
+        status: "success",
+        count: users.length,
+        users: users
+      });
+    }
+
+    // 3. Fetch Full Attendance Records
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = getOrCreateAttendanceSheet(ss);
+    var data = sheet.getDataRange().getValues();
+
+    if (data.length <= 1) {
+      return createAttendanceJsonResponse({
+        status: "success",
+        totalAttendanceRows: 0,
+        count: 0,
+        attendance: [],
+        records: [],
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    var headers = data[0].map(function(h) { return String(h || "").trim(); });
+    var attendanceList = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      if (!row || row.every(function(c) { return c === "" || c === null || c === undefined; })) continue;
+      var recObj = {};
+      for (var j = 0; j < headers.length; j++) {
+        var val = row[j];
+        if (val instanceof Date) {
+          val = Utilities.formatDate(val, Session.getScriptTimeZone() || "Asia/Dhaka", "yyyy-MM-dd HH:mm:ss");
+        }
+        recObj[headers[j]] = (val !== undefined && val !== null) ? String(val) : "";
+      }
+      if (recObj.id || recObj.userId || recObj.username || recObj.sellerName || recObj.date) {
+        attendanceList.push(recObj);
+      }
+    }
+
+    return createAttendanceJsonResponse({
+      status: "success",
+      totalAttendanceRows: attendanceList.length,
+      count: attendanceList.length,
+      attendance: attendanceList,
+      records: attendanceList,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (err) {
+    return createAttendanceJsonResponse({ status: "error", message: err.toString() });
+  }
+}
+
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return createAttendanceJsonResponse({ status: "error", message: "No post data received" });
+    }
+
+    var raw = e.postData.contents;
+    var payload = JSON.parse(raw);
+
+    // 1. Ping / Test via POST
+    if (payload.action === "ping" || payload.action === "test") {
+      return createAttendanceJsonResponse({ status: "success", message: "POST connection OK" });
+    }
+
+    // 2. Fetch Users via POST
+    if (payload.action === "getUsers" || payload.sheet === "users" || payload.tab === "users") {
+      var users = getAttendanceUsersList();
+      return createAttendanceJsonResponse({ status: "success", count: users.length, users: users });
+    }
+
+    // 3. Fetch Attendance via POST
+    if (payload.action === "getAttendance" || payload.action === "read" || payload.sheet === "attendance") {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = getOrCreateAttendanceSheet(ss);
+      var data = sheet.getDataRange().getValues();
+      var headers = data[0].map(function(h) { return String(h || "").trim(); });
+      var attendanceList = [];
+      for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+        if (!row || row.every(function(c) { return c === "" || c === null || c === undefined; })) continue;
+        var recObj = {};
+        for (var j = 0; j < headers.length; j++) {
+          var val = row[j];
+          if (val instanceof Date) {
+            val = Utilities.formatDate(val, Session.getScriptTimeZone() || "Asia/Dhaka", "yyyy-MM-dd HH:mm:ss");
+          }
+          recObj[headers[j]] = (val !== undefined && val !== null) ? String(val) : "";
+        }
+        if (recObj.id || recObj.userId || recObj.username || recObj.sellerName || recObj.date) {
+          attendanceList.push(recObj);
+        }
+      }
+      return createAttendanceJsonResponse({
+        status: "success",
+        totalAttendanceRows: attendanceList.length,
+        count: attendanceList.length,
+        attendance: attendanceList,
+        records: attendanceList,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // 4. Sync Attendance Records (Supports payload.changes.attendance AND payload.attendance)
+    var records = [];
+    if (payload.changes && payload.changes.attendance) {
+      records = payload.changes.attendance;
+    } else if (payload.attendance) {
+      records = payload.attendance;
+    } else if (payload.records) {
+      records = payload.records;
+    } else if (Array.isArray(payload)) {
+      records = payload;
+    }
+
+    if (records && records.length > 0) {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var sheet = getOrCreateAttendanceSheet(ss);
+      var data = sheet.getDataRange().getValues();
+      var headers = data[0].map(function(h) { return String(h || "").trim(); });
+      var idIndex = headers.indexOf("id");
+
+      var updatedCount = 0;
+      var insertedCount = 0;
+
+      records.forEach(function(rec) {
+        var existingRowIndex = -1;
+        if (idIndex !== -1 && rec.id) {
+          for (var r = 1; r < data.length; r++) {
+            if (String(data[r][idIndex]) === String(rec.id)) {
+              existingRowIndex = r + 1;
+              break;
+            }
+          }
+        }
+
+        var rowValues = headers.map(function(h) {
+          return (rec[h] !== undefined && rec[h] !== null) ? String(rec[h]) : "";
+        });
+
+        if (existingRowIndex > 0) {
+          sheet.getRange(existingRowIndex, 1, 1, headers.length).setValues([rowValues]);
+          updatedCount++;
+        } else {
+          sheet.appendRow(rowValues);
+          insertedCount++;
+        }
+      });
+
+      return createAttendanceJsonResponse({
+        status: "success",
+        syncedCount: records.length,
+        inserted: insertedCount,
+        updated: updatedCount,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    return createAttendanceJsonResponse({ status: "success", message: "Payload processed" });
+
+  } catch (err) {
+    return createAttendanceJsonResponse({ status: "error", message: err.toString() });
+  }
+}
+
+function getOrCreateAttendanceSheet(ss) {
+  if (!ss) ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("attendance") || ss.getSheetByName("Attendance");
+  if (!sheet) {
+    sheet = ss.insertSheet("attendance");
+    sheet.appendRow(ATTENDANCE_HEADERS);
+    sheet.getRange(1, 1, 1, ATTENDANCE_HEADERS.length)
+      .setFontWeight("bold")
+      .setBackground("#1E293B")
+      .setFontColor("#FFFFFF");
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getAttendanceUsersList() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("users") || ss.getSheetByName("Users");
+
+  if (!sheet) {
+    sheet = ss.insertSheet("users");
+    var defaultHeaders = ["userId", "username", "password", "sellerName", "email", "role", "phone"];
+    sheet.appendRow(defaultHeaders);
+    sheet.getRange(1, 1, 1, defaultHeaders.length)
+      .setFontWeight("bold")
+      .setBackground("#1E293B")
+      .setFontColor("#FFFFFF");
+    sheet.setFrozenRows(1);
+
+    // Initial default demo sellers
+    sheet.appendRow(["SELLER01", "rayhan", "123", "Rayhan Gazi", "rayhangazi400@gmail.com", "Senior Sales Executive", "+880 1700-000001"]);
+    sheet.appendRow(["SELLER02", "admin", "123", "Homeaura Manager", "admin@homeaura.com", "Branch Manager", "+880 1700-000002"]);
+    sheet.appendRow(["SELLER03", "arif", "123", "Ariful Islam", "arif@homeaura.com", "Sales Associate", "+880 1700-000003"]);
+  }
+
+  var values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+
+  var headers = values[0].map(function(h) { return String(h).trim(); });
+  var users = [];
+
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    var userObj = {};
+    for (var j = 0; j < headers.length; j++) {
+      userObj[headers[j]] = row[j] !== undefined ? String(row[j]).trim() : "";
+    }
+    if (userObj.username || userObj.userId) {
+      users.push(userObj);
+    }
+  }
+  return users;
+}
+
+function createAttendanceJsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+

@@ -1812,6 +1812,45 @@
                     </div>
                   </div>
 
+                  <!-- Specific Month Selector (when dateRange === 'month') -->
+                  <div
+                    v-if="dashboardFilter.dateRange === 'month'"
+                    class="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex flex-wrap items-center justify-between gap-3 bg-indigo-50/50 dark:bg-indigo-950/20 p-3 rounded-xl border border-indigo-100 dark:border-indigo-900/40"
+                  >
+                    <div class="flex items-center gap-3">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                          <svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Select Month:
+                        </span>
+                        <select
+                          v-model="dashboardFilter.selectedMonth"
+                          class="bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-700 text-slate-900 dark:text-slate-100 text-xs font-semibold px-3 py-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs cursor-pointer"
+                        >
+                          <option v-for="m in availableDashboardMonths" :key="m.value" :value="m.value">
+                            {{ m.label }}
+                          </option>
+                        </select>
+                      </div>
+                      <span class="text-xs text-indigo-700 dark:text-indigo-300 font-medium hidden sm:inline">
+                        (Active Month: <span class="font-bold underline">{{ dashboardFilter.selectedMonth }}</span>)
+                      </span>
+                    </div>
+
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        @click="dashboardFilter.selectedMonth = getTodayBstDateString().substring(0, 7)"
+                        :class="dashboardFilter.selectedMonth === getTodayBstDateString().substring(0, 7) ? 'bg-indigo-600 text-white font-bold' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 border border-slate-200 dark:border-slate-700'"
+                        class="px-2.5 py-1 text-[11px] rounded-lg transition-all shadow-2xs cursor-pointer"
+                      >
+                        ⚡ Current Active Month
+                      </button>
+                    </div>
+                  </div>
+
                   <!-- Custom Date Range Selector (when dateRange === 'custom') -->
                   <div
                     v-if="dashboardFilter.dateRange === 'custom'"
@@ -3555,27 +3594,48 @@
                 <div
                   class="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3"
                 >
-                  <!-- Search Box -->
-                  <div class="relative w-full md:w-80">
-                    <svg
-                      class="w-4 h-4 absolute left-3 top-3 text-slate-400 dark:text-slate-500"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  <!-- Search Box with Enter Button & Clear -->
+                  <div class="flex items-center gap-1.5 w-full md:w-80">
+                    <div class="relative flex-1">
+                      <svg
+                        class="w-4 h-4 absolute left-3 top-3 text-slate-400 dark:text-slate-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                        />
+                      </svg>
+                      <input
+                        v-model="orderSearchInput"
+                        @keyup.enter="applyOrderSearch"
+                        type="text"
+                        placeholder="Search customer, phone, code..."
+                        class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-7 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 font-medium"
                       />
-                    </svg>
-                    <input
-                      v-model="orderSearch"
-                      type="text"
-                      placeholder="Search customer, phone, code..."
-                      class="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500"
-                    />
+                      <button
+                        v-if="orderSearchInput"
+                        @click="clearOrderSearch"
+                        type="button"
+                        class="absolute right-2 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs p-0.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                        title="Clear"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <button
+                      @click="applyOrderSearch"
+                      type="button"
+                      class="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1 shadow-sm shrink-0 cursor-pointer"
+                      title="Search (or press Enter)"
+                    >
+                      <span>Search</span>
+                      <kbd class="text-[10px] bg-indigo-700/80 px-1 py-0.2 rounded font-mono text-indigo-100">↵</kbd>
+                    </button>
                   </div>
 
                   <!-- Filter Controls -->
@@ -3593,12 +3653,12 @@
                       </option>
                     </select>
 
-                    <!-- Merchant Filter -->
+                    <!-- Merchant / Seller Filter -->
                     <select
                       v-model="merchantFilter"
                       class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                     >
-                      <option value="ALL">All Merchants</option>
+                      <option value="ALL">All Merchants / Sellers</option>
                       <option
                         v-for="m in sellersList"
                         :key="m?.username"
@@ -3607,6 +3667,39 @@
                         {{ m.name }}
                       </option>
                     </select>
+
+                    <!-- Master Ledger Date Range Filter -->
+                    <select
+                      v-model="ledgerDateRange"
+                      class="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-700 dark:text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                    >
+                      <option value="ALL">🗓️ All Dates</option>
+                      <option value="TODAY">⚡ Today</option>
+                      <option value="YESTERDAY">📅 Yesterday</option>
+                      <option value="7DAYS">📊 Past 7 Days</option>
+                      <option value="THIS_MONTH">🗓️ This Month</option>
+                      <option value="CUSTOM">🛠️ Custom Range</option>
+                    </select>
+
+                    <!-- Custom Date Range Inputs for Master Ledger -->
+                    <div
+                      v-if="ledgerDateRange === 'CUSTOM'"
+                      class="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-xl text-xs"
+                    >
+                      <input
+                        type="date"
+                        v-model="ledgerStartDate"
+                        class="bg-transparent text-xs text-slate-800 dark:text-slate-200 font-semibold focus:outline-none"
+                        title="From Date"
+                      />
+                      <span class="text-slate-400 font-bold">to</span>
+                      <input
+                        type="date"
+                        v-model="ledgerEndDate"
+                        class="bg-transparent text-xs text-slate-800 dark:text-slate-200 font-semibold focus:outline-none"
+                        title="To Date"
+                      />
+                    </div>
 
                     <!-- Factory Filter -->
                     <select
@@ -3740,6 +3833,167 @@
                   >
                     Clear selection
                   </button>
+                </div>
+
+                <!-- Active Search Query Indicator Banner -->
+                <div
+                  v-if="orderSearch"
+                  class="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-4 py-2.5 rounded-2xl flex items-center justify-between gap-3 text-xs text-amber-900 dark:text-amber-200 shadow-xs"
+                >
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-bold flex items-center gap-1.5">
+                      <svg class="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      Search filter applied:
+                    </span>
+                    <span class="font-mono font-bold bg-amber-100 dark:bg-amber-900/60 px-2 py-0.5 rounded text-amber-900 dark:text-amber-100">"{{ orderSearch }}"</span>
+                    <span class="text-amber-700 dark:text-amber-300">({{ filteredOrders.length }} order{{ filteredOrders.length === 1 ? '' : 's' }} matched)</span>
+                  </div>
+                  <button
+                    @click="clearOrderSearch"
+                    type="button"
+                    class="font-bold text-amber-800 dark:text-amber-200 hover:text-amber-950 dark:hover:text-white hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Clear Search</span>
+                    <span class="text-xs">✕</span>
+                  </button>
+                </div>
+
+                <!-- Seller & Date Range Total Sales Performance Summary Widget -->
+                <div
+                  class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 shadow-xs transition-all"
+                  :class="{'ring-2 ring-indigo-500/30 border-indigo-300 dark:border-indigo-800 bg-indigo-50/10': merchantFilter !== 'ALL' || ledgerDateRange !== 'ALL'}"
+                >
+                  <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <!-- Left: Seller & Date Range Info -->
+                    <div>
+                      <div class="flex items-center gap-2 flex-wrap mb-1.5">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                          </svg>
+                          Seller Sales Summary
+                        </span>
+                        <span
+                          class="px-2.5 py-0.5 rounded-full text-xs font-bold transition-colors"
+                          :class="merchantFilter !== 'ALL' ? 'bg-indigo-600 text-white shadow-2xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'"
+                        >
+                          👤 {{ merchantFilter !== 'ALL' ? merchantFilter : 'All Sellers' }}
+                        </span>
+                        <span
+                          class="px-2.5 py-0.5 rounded-full text-xs font-bold transition-colors"
+                          :class="ledgerDateRange !== 'ALL' ? 'bg-emerald-600 text-white shadow-2xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'"
+                        >
+                          🗓️ {{ sellerLedgerSalesSummary.dateLabel }}
+                        </span>
+                      </div>
+                      <p class="text-xs text-slate-500 dark:text-slate-400">
+                        Total sell and fulfilment summary for <strong class="text-slate-700 dark:text-slate-200">{{ sellerLedgerSalesSummary.sellerName }}</strong> across <strong class="text-slate-700 dark:text-slate-200">{{ sellerLedgerSalesSummary.dateLabel }}</strong>.
+                      </p>
+
+                      <!-- Quick Range Shortcut Chips -->
+                      <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+                        <button
+                          type="button"
+                          @click="ledgerDateRange = 'ALL'; ledgerStartDate = ''; ledgerEndDate = '';"
+                          :class="ledgerDateRange === 'ALL' ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'"
+                          class="px-2 py-0.5 text-[11px] rounded-lg transition-all cursor-pointer"
+                        >
+                          All Time
+                        </button>
+                        <button
+                          type="button"
+                          @click="ledgerDateRange = 'THIS_MONTH'; ledgerStartDate = ''; ledgerEndDate = '';"
+                          :class="ledgerDateRange === 'THIS_MONTH' ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'"
+                          class="px-2 py-0.5 text-[11px] rounded-lg transition-all cursor-pointer"
+                        >
+                          This Month
+                        </button>
+                        <button
+                          type="button"
+                          @click="ledgerDateRange = '7DAYS'; ledgerStartDate = ''; ledgerEndDate = '';"
+                          :class="ledgerDateRange === '7DAYS' ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'"
+                          class="px-2 py-0.5 text-[11px] rounded-lg transition-all cursor-pointer"
+                        >
+                          Past 7 Days
+                        </button>
+                        <button
+                          type="button"
+                          @click="ledgerDateRange = 'TODAY'; ledgerStartDate = ''; ledgerEndDate = '';"
+                          :class="ledgerDateRange === 'TODAY' ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'"
+                          class="px-2 py-0.5 text-[11px] rounded-lg transition-all cursor-pointer"
+                        >
+                          Today
+                        </button>
+                        <button
+                          type="button"
+                          @click="ledgerDateRange = 'CUSTOM'"
+                          :class="ledgerDateRange === 'CUSTOM' ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'"
+                          class="px-2 py-0.5 text-[11px] rounded-lg transition-all cursor-pointer"
+                        >
+                          Custom Range...
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Right: Total Sell and Status Metrics -->
+                    <div class="flex flex-wrap items-center gap-3 sm:gap-4">
+                      <!-- Total Sell Card -->
+                      <div class="bg-gradient-to-br from-emerald-600 to-teal-700 text-white px-4 py-3 rounded-2xl shadow-sm border border-emerald-500/30">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-100">
+                          Total Sell Amount
+                        </div>
+                        <div class="text-xl sm:text-2xl font-black tracking-tight mt-0.5">
+                          ৳{{ formatBDT(sellerLedgerSalesSummary.totalSales) }}
+                        </div>
+                        <div class="text-[10px] text-emerald-100/90 font-medium mt-0.5">
+                          Net: ৳{{ formatBDT(sellerLedgerSalesSummary.netRevenue) }}
+                        </div>
+                      </div>
+
+                      <!-- Delivered Sales Card -->
+                      <div class="bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 px-3.5 py-3 rounded-2xl">
+                        <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Delivered Sales
+                        </div>
+                        <div class="text-base sm:text-lg font-extrabold text-slate-800 dark:text-slate-100 mt-0.5">
+                          ৳{{ formatBDT(sellerLedgerSalesSummary.deliveredSales) }}
+                        </div>
+                        <div class="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5">
+                          ✓ {{ sellerLedgerSalesSummary.deliveredCount }} Delivered Orders
+                        </div>
+                      </div>
+
+                      <!-- Orders Volume Breakdown -->
+                      <div class="bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 px-3.5 py-3 rounded-2xl flex items-center gap-3.5 text-xs">
+                        <div>
+                          <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                            Total Orders
+                          </div>
+                          <div class="text-base sm:text-lg font-extrabold text-slate-800 dark:text-slate-100 mt-0.5">
+                            {{ sellerLedgerSalesSummary.totalOrders }}
+                          </div>
+                        </div>
+                        <div class="h-8 w-px bg-slate-200 dark:bg-slate-700"></div>
+                        <div class="space-y-0.5 text-[11px]">
+                          <span class="text-amber-600 dark:text-amber-400 font-semibold block">⏳ {{ sellerLedgerSalesSummary.pendingCount }} Pending</span>
+                          <span v-if="sellerLedgerSalesSummary.cancelledCount > 0" class="text-rose-500 font-medium block">✕ {{ sellerLedgerSalesSummary.cancelledCount }} Cancelled</span>
+                        </div>
+                      </div>
+
+                      <!-- Reset Filters Button if active -->
+                      <button
+                        v-if="merchantFilter !== 'ALL' || ledgerDateRange !== 'ALL'"
+                        @click="merchantFilter = 'ALL'; ledgerDateRange = 'ALL'; ledgerStartDate = ''; ledgerEndDate = '';"
+                        type="button"
+                        class="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline px-2 py-1 cursor-pointer"
+                        title="Reset seller and date filters to All"
+                      >
+                        Reset Filter
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <!-- Ledger Table Container -->
