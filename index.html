@@ -1764,14 +1764,24 @@
                           </svg>
                           Select Specific Date:
                         </span>
-                        <input
-                          type="date"
-                          v-model="dashboardFilter.specificDate"
-                          class="bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-700 text-slate-900 dark:text-slate-100 text-xs font-semibold px-3 py-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-xs"
-                        />
+                        <div class="relative inline-flex items-center group">
+                          <input
+                            type="date"
+                            v-model="dashboardFilter.specificDate"
+                            class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                          />
+                          <div class="flex items-center gap-2 bg-white dark:bg-slate-900 border border-indigo-200 dark:border-indigo-700 text-slate-900 dark:text-slate-100 text-xs font-bold px-3 py-1.5 rounded-lg min-w-[130px] justify-between shadow-xs group-hover:border-indigo-400">
+                            <span :class="dashboardFilter.specificDate ? 'text-indigo-600 dark:text-indigo-400 font-mono font-bold' : 'text-slate-400 font-normal'">
+                              {{ dashboardFilter.specificDate ? formatDisplayDateOnly(dashboardFilter.specificDate) : 'dd-mmm-yy' }}
+                            </span>
+                            <svg class="w-3.5 h-3.5 text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                        </div>
                       </div>
                       <span class="text-xs text-indigo-700 dark:text-indigo-300 font-medium hidden sm:inline">
-                        (Viewing metrics & orders for: <span class="font-bold underline">{{ dashboardFilter.specificDate }}</span>)
+                        (Viewing metrics & orders for: <span class="font-bold underline">{{ formatDisplayDateOnly(dashboardFilter.specificDate) }}</span>)
                       </span>
                     </div>
 
@@ -1858,19 +1868,57 @@
                   >
                     <div class="flex items-center gap-2">
                       <span class="text-xs font-bold text-slate-700 dark:text-slate-300">From Date:</span>
-                      <input
-                        type="date"
-                        v-model="dashboardFilter.startDate"
-                        class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-xs font-semibold px-3 py-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
+                      <div class="relative inline-flex items-center group">
+                        <input
+                          type="date"
+                          v-model="dashboardFilter.startDate"
+                          class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                        />
+                        <div class="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-xs font-bold px-3 py-1.5 rounded-lg min-w-[130px] justify-between shadow-2xs group-hover:border-indigo-400">
+                          <span :class="dashboardFilter.startDate ? 'text-indigo-600 dark:text-indigo-400 font-mono font-bold' : 'text-slate-400 font-normal'">
+                            {{ dashboardFilter.startDate ? formatDisplayDateOnly(dashboardFilter.startDate) : 'dd-mmm-yy' }}
+                          </span>
+                          <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      </div>
                     </div>
                     <div class="flex items-center gap-2">
                       <span class="text-xs font-bold text-slate-700 dark:text-slate-300">To Date:</span>
-                      <input
-                        type="date"
-                        v-model="dashboardFilter.endDate"
-                        class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-xs font-semibold px-3 py-1.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
+                      <div class="relative inline-flex items-center group">
+                        <input
+                          type="date"
+                          v-model="dashboardFilter.endDate"
+                          class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                        />
+                        <div class="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-xs font-bold px-3 py-1.5 rounded-lg min-w-[130px] justify-between shadow-2xs group-hover:border-indigo-400">
+                          <span :class="dashboardFilter.endDate ? 'text-indigo-600 dark:text-indigo-400 font-mono font-bold' : 'text-slate-400 font-normal'">
+                            {{ dashboardFilter.endDate ? formatDisplayDateOnly(dashboardFilter.endDate) : 'dd-mmm-yy' }}
+                          </span>
+                          <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Range summary indicator -->
+                    <div
+                      v-if="dashboardFilter.startDate || dashboardFilter.endDate"
+                      class="flex items-center gap-1.5 text-xs text-indigo-700 dark:text-indigo-300 font-bold bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800"
+                    >
+                      <span class="text-slate-500 dark:text-slate-400 font-normal">Active Range:</span>
+                      <span class="font-mono text-indigo-700 dark:text-indigo-300">
+                        {{ dashboardFilter.startDate ? formatDisplayDateOnly(dashboardFilter.startDate) : 'Start' }} → {{ dashboardFilter.endDate ? formatDisplayDateOnly(dashboardFilter.endDate) : 'End' }}
+                      </span>
+                      <button
+                        type="button"
+                        @click="dashboardFilter.startDate = ''; dashboardFilter.endDate = ''"
+                        title="Clear custom range"
+                        class="ml-1 text-slate-400 hover:text-rose-500 cursor-pointer font-bold transition-colors"
+                      >
+                        ✕
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -2253,7 +2301,7 @@
                           </span>
                         </div>
                         <span class="text-[11px] text-slate-400">
-                          Date: <strong class="text-slate-700 dark:text-slate-300 font-mono">{{ dailyTargetDate }}</strong>
+                          Date: <strong class="text-slate-700 dark:text-slate-300 font-mono">{{ formatDisplayDateOnly(dailyTargetDate) }}</strong>
                         </span>
                       </div>
 
@@ -3056,7 +3104,7 @@
                                 </span>
                               </div>
                               <div class="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
-                                {{ day.date }}
+                                {{ formatDisplayDateOnly(day.date) }}
                               </div>
                             </td>
 
@@ -3636,6 +3684,23 @@
                       <span>Search</span>
                       <kbd class="text-[10px] bg-indigo-700/80 px-1 py-0.2 rounded font-mono text-indigo-100">↵</kbd>
                     </button>
+
+                    <!-- Active Search Filter Badge -->
+                    <div
+                      v-if="orderSearch"
+                      class="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-50 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-bold text-indigo-700 dark:text-indigo-300 shrink-0"
+                    >
+                      <span>🔍 "{{ orderSearch }}"</span>
+                      <span class="text-[10px] bg-indigo-200/70 dark:bg-indigo-800/80 px-1.5 py-0.2 rounded font-mono">({{ filteredOrders.length }})</span>
+                      <button
+                        @click="clearOrderSearch"
+                        type="button"
+                        class="text-indigo-400 hover:text-rose-600 ml-0.5 cursor-pointer font-bold"
+                        title="Clear search filter"
+                      >
+                        ✕
+                      </button>
+                    </div>
                   </div>
 
                   <!-- Filter Controls -->
@@ -3684,21 +3749,35 @@
                     <!-- Custom Date Range Inputs for Master Ledger -->
                     <div
                       v-if="ledgerDateRange === 'CUSTOM'"
-                      class="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-xl text-xs"
+                      class="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-xl text-xs"
                     >
-                      <input
-                        type="date"
-                        v-model="ledgerStartDate"
-                        class="bg-transparent text-xs text-slate-800 dark:text-slate-200 font-semibold focus:outline-none"
-                        title="From Date"
-                      />
+                      <div class="relative inline-flex items-center group">
+                        <input
+                          type="date"
+                          v-model="ledgerStartDate"
+                          class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                          title="From Date"
+                        />
+                        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono font-bold text-xs">
+                          <span :class="ledgerStartDate ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 font-normal'">
+                            {{ ledgerStartDate ? formatDisplayDateOnly(ledgerStartDate) : 'dd-mmm-yy' }}
+                          </span>
+                        </div>
+                      </div>
                       <span class="text-slate-400 font-bold">to</span>
-                      <input
-                        type="date"
-                        v-model="ledgerEndDate"
-                        class="bg-transparent text-xs text-slate-800 dark:text-slate-200 font-semibold focus:outline-none"
-                        title="To Date"
-                      />
+                      <div class="relative inline-flex items-center group">
+                        <input
+                          type="date"
+                          v-model="ledgerEndDate"
+                          class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                          title="To Date"
+                        />
+                        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono font-bold text-xs">
+                          <span :class="ledgerEndDate ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 font-normal'">
+                            {{ ledgerEndDate ? formatDisplayDateOnly(ledgerEndDate) : 'dd-mmm-yy' }}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     <!-- Factory Filter -->
@@ -3875,18 +3954,69 @@
                           </svg>
                           Seller Sales Summary
                         </span>
-                        <span
-                          class="px-2.5 py-0.5 rounded-full text-xs font-bold transition-colors"
-                          :class="merchantFilter !== 'ALL' ? 'bg-indigo-600 text-white shadow-2xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'"
+                        <!-- Inline Seller Dropdown -->
+                        <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-xl">
+                          <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400">Seller:</span>
+                          <select
+                            v-model="merchantFilter"
+                            class="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
+                          >
+                            <option value="ALL">All Sellers / Merchants</option>
+                            <option v-for="m in sellersList" :key="m?.username" :value="m.name">
+                              {{ m.name }}
+                            </option>
+                          </select>
+                        </div>
+
+                        <!-- Inline Date Range Dropdown -->
+                        <div class="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 px-2 py-0.5 rounded-xl">
+                          <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400">Range:</span>
+                          <select
+                            v-model="ledgerDateRange"
+                            class="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
+                          >
+                            <option value="ALL">🗓️ All Dates (All Time)</option>
+                            <option value="TODAY">⚡ Today</option>
+                            <option value="YESTERDAY">📅 Yesterday</option>
+                            <option value="7DAYS">📊 Past 7 Days</option>
+                            <option value="THIS_MONTH">🗓️ This Month</option>
+                            <option value="CUSTOM">🛠️ Custom Range</option>
+                          </select>
+                        </div>
+
+                        <!-- Inline Custom Dates if CUSTOM is chosen -->
+                        <div
+                          v-if="ledgerDateRange === 'CUSTOM'"
+                          class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-xl text-xs"
                         >
-                          👤 {{ merchantFilter !== 'ALL' ? merchantFilter : 'All Sellers' }}
-                        </span>
-                        <span
-                          class="px-2.5 py-0.5 rounded-full text-xs font-bold transition-colors"
-                          :class="ledgerDateRange !== 'ALL' ? 'bg-emerald-600 text-white shadow-2xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'"
-                        >
-                          🗓️ {{ sellerLedgerSalesSummary.dateLabel }}
-                        </span>
+                          <div class="relative inline-flex items-center group">
+                            <input
+                              type="date"
+                              v-model="ledgerStartDate"
+                              class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                              title="From Date"
+                            />
+                            <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono font-bold text-xs">
+                              <span :class="ledgerStartDate ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 font-normal'">
+                                {{ ledgerStartDate ? formatDisplayDateOnly(ledgerStartDate) : 'dd-mmm-yy' }}
+                              </span>
+                            </div>
+                          </div>
+                          <span class="text-slate-400 font-bold">to</span>
+                          <div class="relative inline-flex items-center group">
+                            <input
+                              type="date"
+                              v-model="ledgerEndDate"
+                              class="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                              title="To Date"
+                            />
+                            <div class="flex items-center gap-1 px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 font-mono font-bold text-xs">
+                              <span :class="ledgerEndDate ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 font-normal'">
+                                {{ ledgerEndDate ? formatDisplayDateOnly(ledgerEndDate) : 'dd-mmm-yy' }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       <p class="text-xs text-slate-500 dark:text-slate-400">
                         Total sell and fulfilment summary for <strong class="text-slate-700 dark:text-slate-200">{{ sellerLedgerSalesSummary.sellerName }}</strong> across <strong class="text-slate-700 dark:text-slate-200">{{ sellerLedgerSalesSummary.dateLabel }}</strong>.
@@ -4673,7 +4803,7 @@
                             Bill Date:
                             <span
                               class="text-slate-700 dark:text-slate-300 font-bold"
-                              >{{ bill.date }}</span
+                              >{{ formatDisplayDateOnly(bill.date) }}</span
                             >
                             • ID: {{ bill.id }}
                           </div>
@@ -5169,7 +5299,7 @@
                           <td
                             class="p-3 font-medium text-slate-700 dark:text-slate-300"
                           >
-                            {{ exp.date }}
+                            {{ formatDisplayDateOnly(exp.date) }}
                           </td>
                           <td class="p-3">
                             <span
@@ -6618,7 +6748,7 @@
                           <td
                             class="p-3 text-slate-600 dark:text-slate-300 font-medium"
                           >
-                            {{ spend.date }}
+                            {{ formatDisplayDateOnly(spend.date) }}
                           </td>
                           <td
                             class="p-3 font-bold text-slate-800 dark:text-slate-200"
@@ -6772,11 +6902,15 @@
                           <div class="flex items-center gap-2 flex-wrap">
                             <span
                               class="text-[10px] font-extrabold uppercase tracking-wider text-indigo-700 dark:text-indigo-300"
-                              >Ready Order Number</span
+                              >Seller Order Serial</span
+                            >
+                            <span
+                              class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800"
+                              >👤 {{ activeIntakeSeller?.name || currentUser.name }}</span
                             >
                             <span
                               class="text-[9px] px-2 py-0.5 rounded-full bg-indigo-100/90 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-700"
-                              >Assigned Upon Submission</span
+                              >Prefix: {{ activeIntakeSeller?.pagePrefix || currentUser.pagePrefix || 'ORD' }}</span
                             >
                           </div>
                           <div class="flex items-baseline gap-2 mt-0.5">
@@ -6785,14 +6919,28 @@
                               >{{ nextUpcomingOrderId }}</span
                             >
                             <span
-                              class="text-xs text-slate-400 dark:text-slate-500 font-medium"
-                              >(Seq #{{ nextUpcomingOrderNum }})</span
+                              class="text-xs text-indigo-600 dark:text-indigo-400 font-semibold"
+                              >(Seller Serial #{{ nextUpcomingOrderNum }})</span
                             >
                           </div>
                         </div>
                       </div>
 
-                      <div class="flex items-center gap-2">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <!-- Admin / Moderator: Choose Seller for Intake -->
+                        <div v-if="currentUser.role === 'admin' || currentUser.role === 'moderator'" class="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 px-2.5 py-1 rounded-xl">
+                          <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400">Seller:</span>
+                          <select
+                            v-model="intakeForm.selectedSellerId"
+                            class="bg-transparent text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none cursor-pointer"
+                          >
+                            <option value="">Current User ({{ currentUser.name }})</option>
+                            <option v-for="u in sellersList" :key="u.id" :value="u.id">
+                              {{ u.name }} ({{ u.pagePrefix || 'ORD' }})
+                            </option>
+                          </select>
+                        </div>
+
                         <button
                           type="button"
                           @click="copyUpcomingOrderId"
@@ -12549,7 +12697,7 @@
                           >${{ hist.amount.toFixed(2) }}</span
                         >
                         <span class="text-[10px] text-slate-400"
-                          >{{ new Date(hist.timestamp).toLocaleString() }}</span
+                          >{{ formatBangladeshDisplayTime(hist.timestamp) }}</span
                         >
                       </div>
                       <div class="text-[10px] text-slate-500">
@@ -12725,7 +12873,7 @@
                             Orders for {{ selectedDateDetails.formattedDate }}
                           </h3>
                           <p class="text-[11px] text-slate-500 dark:text-slate-400">
-                            {{ selectedDateDetails.dayLabel ? selectedDateDetails.dayLabel + ' • ' : '' }}Date: {{ selectedDateDetails.date }} (BST)
+                            {{ selectedDateDetails.dayLabel ? selectedDateDetails.dayLabel + ' • ' : '' }}Date: {{ formatDisplayDateOnly(selectedDateDetails.date) }} (BST)
                           </p>
                         </div>
                       </div>
@@ -12843,7 +12991,7 @@
                   <!-- Footer -->
                   <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                     <span class="text-[11px] text-slate-400">
-                      Showing {{ selectedDateDetails.orders.length }} logged orders for {{ selectedDateDetails.date }}
+                      Showing {{ selectedDateDetails.orders.length }} logged orders for {{ formatDisplayDateOnly(selectedDateDetails.date) }}
                     </span>
                     <button
                       type="button"

@@ -142,7 +142,7 @@ async function startServer() {
   // - Not found: 5 minutes
   const sfcCache = new Map<string, { data: any; expiresAt: number }>();
 
-  async function fetchWithTimeout(url: string, options: any, timeoutMs = 6000) {
+  async function fetchWithTimeout(url: string, options: any, timeoutMs = 2500) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -192,19 +192,16 @@ async function startServer() {
 
     // Helper to try an endpoint across base URLs
     const tryEndpoint = async (path: string) => {
-      const baseUrls = [STEADFAST_BASE_URL, 'https://portal.steadfast.com.bd/api/v1'];
-      for (const base of baseUrls) {
-        try {
-          const res = await fetchWithTimeout(`${base}/${path}`, { headers }, 5000);
-          if (res.ok) {
-            const json: any = await res.json();
-            if (json && (json.status === 200 || json.delivery_status)) {
-              return json;
-            }
+      try {
+        const res = await fetchWithTimeout(`${STEADFAST_BASE_URL}/${path}`, { headers }, 1800);
+        if (res.ok) {
+          const json: any = await res.json();
+          if (json && (json.status === 200 || json.delivery_status)) {
+            return json;
           }
-        } catch {
-          // ignore and continue
         }
+      } catch {
+        // continue
       }
       return null;
     };
@@ -330,8 +327,8 @@ async function startServer() {
         }
       }
 
-      // Throttled processing with concurrency: 4 for uncached items
-      const chunkSize = 4;
+      // Throttled processing with concurrency: 8 for uncached items
+      const chunkSize = 8;
       for (let i = 0; i < pendingFetch.length; i += chunkSize) {
         const chunk = pendingFetch.slice(i, i + chunkSize);
         await Promise.all(
@@ -341,7 +338,7 @@ async function startServer() {
           })
         );
         if (i + chunkSize < pendingFetch.length) {
-          await new Promise(r => setTimeout(r, 120));
+          await new Promise(r => setTimeout(r, 40));
         }
       }
       
@@ -553,67 +550,6 @@ async function startServer() {
       res.json({ results });
     } catch (err: any) {
       console.error('[SFC Bulk Fraud Check Error]', err);
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // --- WI-FI ATTENDANCE & LUNCH TRACKING NETWORK API ---
-  app.get('/api/attendance/network-check', (req, res) => {
-    try {
-      const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-      const now = new Date();
-      const dhakaTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' });
-      const dhakaDate = new Date(dhakaTimeStr);
-
-      const hours = dhakaDate.getHours();
-      const minutes = dhakaDate.getMinutes();
-      const isPast2Pm = hours >= 14;
-
-      res.json({
-        success: true,
-        clientIp: typeof clientIp === 'string' ? clientIp.split(',')[0].trim() : clientIp,
-        timestamp: now.toISOString(),
-        dhakaTime: dhakaTimeStr,
-        dhakaHour: hours,
-        dhakaMinute: minutes,
-        isPast2Pm: isPast2Pm,
-        officeSsid: 'Homeaura'
-      });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  app.post('/api/attendance/event', async (req, res) => {
-    try {
-      const { userId, username, sellerName, event, clientTimestamp, deviceInfo, notes } = req.body;
-      const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-      const now = new Date();
-      const dhakaTimeStr = now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' });
-      const dhakaDate = new Date(dhakaTimeStr);
-
-      const year = dhakaDate.getFullYear();
-      const month = String(dhakaDate.getMonth() + 1).padStart(2, '0');
-      const day = String(dhakaDate.getDate()).padStart(2, '0');
-      const dateKey = `${year}-${month}-${day}`;
-
-      let h = dhakaDate.getHours();
-      const m = String(dhakaDate.getMinutes()).padStart(2, '0');
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      h = h % 12 || 12;
-      const formattedTime = `${String(h).padStart(2, '0')}:${m} ${ampm}`;
-
-      res.json({
-        success: true,
-        receivedEvent: event,
-        date: dateKey,
-        time: formattedTime,
-        isPast2Pm: dhakaDate.getHours() >= 14,
-        clientIp: typeof clientIp === 'string' ? clientIp.split(',')[0].trim() : clientIp,
-        deviceInfo: deviceInfo || 'Web/Mobile Client',
-        timestamp: now.toISOString()
-      });
-    } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
   });

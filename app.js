@@ -180,9 +180,23 @@
           let d = new Date(str);
           if (!isNaN(d.getTime())) return d;
 
-          // Parse DD/MM/YYYY or DD-MM-YYYY with optional time
+          // Parse DD/MM/YYYY, DD-MM-YYYY, or DD-MMM-YY with optional time
           const dateOnlyPart = str.split(/[T\s,]+/)[0];
           const timePart = str.includes(':') ? str.split(/[T\s,]+/).slice(1).join(' ').trim() : '';
+
+          // Support DD-MMM-YY format like 01-jan-26
+          const shortMonthRegex = /^(\d{1,2})-([a-zA-Z]{3})-(\d{2,4})$/;
+          const shortMonthMatch = dateOnlyPart.match(shortMonthRegex);
+          if (shortMonthMatch) {
+            const months = { jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12' };
+            const mKey = shortMonthMatch[2].toLowerCase();
+            if (months[mKey]) {
+              const fullYr = shortMonthMatch[3].length === 2 ? `20${shortMonthMatch[3]}` : shortMonthMatch[3];
+              const iso = `${fullYr}-${months[mKey]}-${shortMonthMatch[1].padStart(2, '0')}` + (timePart ? ' ' + timePart : 'T12:00:00Z');
+              d = new Date(iso);
+              if (!isNaN(d.getTime())) return d;
+            }
+          }
           
           if (dateOnlyPart) {
             const parts = dateOnlyPart.split(/[-/.]/);
@@ -301,20 +315,56 @@
           return true;
         };
         
+        const SHORT_MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+        const formatDisplayDateOnly = (isoOrDate) => {
+          if (!isoOrDate) return 'N/A';
+          try {
+            if (typeof isoOrDate === 'string') {
+              const clean = isoOrDate.trim();
+              if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+                const parts = clean.split('-');
+                const mIdx = parseInt(parts[1], 10) - 1;
+                const mStr = SHORT_MONTH_NAMES[mIdx] || 'jan';
+                const yStr = parts[0].slice(-2);
+                return `${parts[2]}-${mStr}-${yStr}`;
+              }
+            }
+            const d = parseToDate(isoOrDate) || new Date(isoOrDate);
+            if (!d || isNaN(d.getTime())) return String(isoOrDate);
+            const dhakaStr = d.toLocaleString('en-US', { timeZone: 'Asia/Dhaka', hour12: false });
+            const dhakaDate = new Date(dhakaStr);
+            if (isNaN(dhakaDate.getTime())) return String(isoOrDate);
+
+            const day = String(dhakaDate.getDate()).padStart(2, '0');
+            const month = SHORT_MONTH_NAMES[dhakaDate.getMonth()] || 'jan';
+            const year = String(dhakaDate.getFullYear()).slice(-2);
+            return `${day}-${month}-${year}`;
+          } catch(e) {
+            return String(isoOrDate);
+          }
+        };
+
         const formatBangladeshDisplayTime = (isoOrDate) => {
           if (!isoOrDate) return 'N/A';
           try {
             const d = parseToDate(isoOrDate) || new Date(isoOrDate);
             if (!d || isNaN(d.getTime())) return String(isoOrDate);
-            return d.toLocaleString('en-GB', {
-              timeZone: 'Asia/Dhaka',
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: true
-            }) + ' BST';
+            const dhakaStr = d.toLocaleString('en-US', { timeZone: 'Asia/Dhaka', hour12: false });
+            const dhakaDate = new Date(dhakaStr);
+            if (isNaN(dhakaDate.getTime())) return String(isoOrDate);
+
+            const day = String(dhakaDate.getDate()).padStart(2, '0');
+            const month = SHORT_MONTH_NAMES[dhakaDate.getMonth()] || 'jan';
+            const year = String(dhakaDate.getFullYear()).slice(-2);
+            const dateStr = `${day}-${month}-${year}`;
+
+            const rawHours = dhakaDate.getHours();
+            const minutes = String(dhakaDate.getMinutes()).padStart(2, '0');
+            const ampm = rawHours >= 12 ? 'pm' : 'am';
+            const hours = String(rawHours % 12 || 12).padStart(2, '0');
+
+            return `${dateStr}, ${hours}:${minutes} ${ampm} BST`;
           } catch(e) {
             return String(isoOrDate);
           }
@@ -338,22 +388,6 @@
           return d.toISOString().split('T')[0];
         };
 
-        const formatDisplayDateOnly = (isoOrDate) => {
-          if (!isoOrDate) return 'N/A';
-          try {
-            const d = parseToDate(isoOrDate) || new Date(isoOrDate);
-            if (!d || isNaN(d.getTime())) return String(isoOrDate);
-            return d.toLocaleDateString('en-GB', {
-              timeZone: 'Asia/Dhaka',
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric'
-            });
-          } catch(e) {
-            return String(isoOrDate);
-          }
-        };
-
         const getBstTimeString = (dateInput = new Date()) => {
           const d = new Date(dateInput);
           if (isNaN(d.getTime())) return '12:00';
@@ -365,15 +399,20 @@
 
         const getBangladeshClockString = () => {
           const now = new Date();
-          return now.toLocaleString('en-GB', {
-            timeZone: 'Asia/Dhaka',
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: true
-          }) + ' BST';
+          const dhakaStr = now.toLocaleString('en-US', { timeZone: 'Asia/Dhaka', hour12: false });
+          const dhakaDate = new Date(dhakaStr);
+          const day = String(dhakaDate.getDate()).padStart(2, '0');
+          const month = SHORT_MONTH_NAMES[dhakaDate.getMonth()] || 'jan';
+          const year = String(dhakaDate.getFullYear()).slice(-2);
+          const dateStr = `${day}-${month}-${year}`;
+
+          const rawHours = dhakaDate.getHours();
+          const minutes = String(dhakaDate.getMinutes()).padStart(2, '0');
+          const seconds = String(dhakaDate.getSeconds()).padStart(2, '0');
+          const ampm = rawHours >= 12 ? 'pm' : 'am';
+          const hours = String(rawHours % 12 || 12).padStart(2, '0');
+
+          return `${dateStr}, ${hours}:${minutes}:${seconds} ${ampm} BST`;
         };
 
         const bangladeshTimeDisplay = ref(getBangladeshClockString());
@@ -1636,13 +1675,10 @@
         const triggerAutoSync = (immediate = false) => {
           if (!appsScriptUrl.value) return;
           if (autoSyncTimeout) clearTimeout(autoSyncTimeout);
-          if (immediate) {
+          // Debounce background pushes so user button clicks execute instantaneously with zero lag
+          autoSyncTimeout = setTimeout(() => {
             pushToGoogleSheets(false);
-          } else {
-            autoSyncTimeout = setTimeout(() => {
-              pushToGoogleSheets(false);
-            }, 1000); // 1-second batching debounce
-          }
+          }, immediate ? 600 : 1800);
         };
 
         const pushToGoogleSheets = async (forceFull = false, isUserTriggered = false) => {
@@ -1664,7 +1700,7 @@
           if (!forceFull && pendingSyncCount.value === 0) return;
 
           isPushing.value = true;
-          isBackingUp.value = true;
+          if (forceFull) isBackingUp.value = true;
           syncStatus.value = 'syncing_push';
 
           // Snapshot queue so newly created changes during request aren't lost
@@ -2693,31 +2729,69 @@
         const clipboardRawText = ref('');
         const parseSuccessMsg = ref('');
         const missingFieldsHighlight = ref(false);
-        const nextUpcomingOrderNum = computed(() => {
+        // --- SELLER-SEPARATE SERIAL NUMBER ENGINE ---
+        // Each seller maintains their own independent serial sequence (e.g. PL-1014, CBH-1036, EC-1019)
+        // There is strictly NO universal serial shared across sellers.
+        const getNextOrderNumberForSeller = (sellerUser) => {
+          const user = sellerUser || currentUser.value;
+          if (!user) return 1001;
+
+          const prefix = (user.pagePrefix && String(user.pagePrefix).trim() !== '')
+            ? String(user.pagePrefix).trim().toUpperCase()
+            : 'ORD';
+
+          const uId = String(user.id || '').trim().toLowerCase();
+          const uName = String(user.name || '').trim().toLowerCase();
+          const uUsername = String(user.username || '').trim().toLowerCase();
+
           let maxNum = 1000;
-          orders.value.forEach(o => {
-            if (o && o.id) {
-              const m = String(o.id).match(/-(\d+)/i);
-              if (m) {
-                const num = parseInt(m[1], 10);
+
+          const checkOrder = (o) => {
+            if (!o || !o.id) return;
+            const oIdStr = String(o.id).trim();
+            const prefixMatch = oIdStr.toUpperCase().startsWith(prefix + '-');
+            const idMatch = uId && String(o.merchantId || '').trim().toLowerCase() === uId;
+            const nameMatch = uName && String(o.merchantName || '').trim().toLowerCase() === uName;
+            const userMatch = uUsername && String(o.updatedBy || '').trim().toLowerCase() === uUsername;
+
+            if (prefixMatch || idMatch || nameMatch || userMatch) {
+              const exactMatch = oIdStr.match(new RegExp(`^${prefix}-(\\d+)`, 'i'));
+              if (exactMatch) {
+                const num = parseInt(exactMatch[1], 10);
                 if (!isNaN(num) && num > maxNum) maxNum = num;
+              } else if (prefixMatch || idMatch || nameMatch) {
+                const generalMatch = oIdStr.match(/-(\d+)/i);
+                if (generalMatch) {
+                  const num = parseInt(generalMatch[1], 10);
+                  if (!isNaN(num) && num > maxNum) maxNum = num;
+                }
               }
             }
-          });
-          deletedOrders.value.forEach(o => {
-            if (o && o.id) {
-              const m = String(o.id).match(/-(\d+)/i);
-              if (m) {
-                const num = parseInt(m[1], 10);
-                if (!isNaN(num) && num > maxNum) maxNum = num;
-              }
-            }
-          });
+          };
+
+          (orders.value || []).forEach(checkOrder);
+          (deletedOrders.value || []).forEach(checkOrder);
+
           return maxNum + 1;
+        };
+
+        const activeIntakeSeller = computed(() => {
+          if ((currentUser.value?.role === 'admin' || currentUser.value?.role === 'moderator') && intakeForm.selectedSellerId) {
+            const s = (users.value || []).find(u => String(u.id) === String(intakeForm.selectedSellerId) || String(u.username) === String(intakeForm.selectedSellerId));
+            if (s) return s;
+          }
+          return currentUser.value;
+        });
+
+        const nextUpcomingOrderNum = computed(() => {
+          return getNextOrderNumberForSeller(activeIntakeSeller.value);
         });
 
         const nextUpcomingOrderId = computed(() => {
-          const customPrefix = (currentUser.value && currentUser.value.pagePrefix && currentUser.value.pagePrefix.trim() !== '') ? currentUser.value.pagePrefix.trim().toUpperCase() : 'ORD';
+          const seller = activeIntakeSeller.value;
+          const customPrefix = (seller && seller.pagePrefix && String(seller.pagePrefix).trim() !== '') 
+            ? String(seller.pagePrefix).trim().toUpperCase() 
+            : 'ORD';
           return `${customPrefix}-${nextUpcomingOrderNum.value}`;
         });
 
@@ -2771,7 +2845,8 @@
           socialProofLocalUrl: '',
           socialProofFileName: '',
           extraDetails: '',
-          factoryTag: ''
+          factoryTag: '',
+          selectedSellerId: ''
         });
 
         const setIntakeOrderDatePreset = (preset) => {
@@ -4554,48 +4629,49 @@
         const matchOrderSearch = (o, query) => {
           if (!o) return false;
           if (!query || !query.trim()) return true;
-          const q = query.trim().toLowerCase();
-          const qDigits = q.replace(/\D/g, '');
+          
+          const rawTokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+          if (rawTokens.length === 0) return true;
 
-          const id = String(o.id || '').toLowerCase();
-          if (id.includes(q)) return true;
-
+          const id = String(o.id || o.orderId || '').toLowerCase();
           const name = String(o.customerName || '').toLowerCase();
-          if (name.includes(q)) return true;
-
           const phone = String(o.customerPhone || '');
           const phoneDigits = phone.replace(/\D/g, '');
-          if (phone.toLowerCase().includes(q)) return true;
-          if (qDigits && qDigits.length >= 3 && (phoneDigits.includes(qDigits) || qDigits.includes(phoneDigits))) return true;
-
           const cn = String(o.cnNumber || '').toLowerCase();
-          if (cn.includes(q)) return true;
-
           const merchant = String(o.merchantName || '').toLowerCase();
-          if (merchant.includes(q)) return true;
-
+          const merchantId = String(o.merchantId || '').toLowerCase();
           const fabric = String(o.fabric || '').toLowerCase();
-          if (fabric.includes(q)) return true;
-
-          const category = String(o.productCategory || '').toLowerCase();
-          if (category.includes(q)) return true;
-
+          const category = String(o.productCategory || o.productName || '').toLowerCase();
           const seat = String(o.seatConfig || '').toLowerCase();
-          if (seat.includes(q)) return true;
-
           const addr = String(o.customerAddress || '').toLowerCase();
-          if (addr.includes(q)) return true;
-
           const notes = String(o.notes || '').toLowerCase();
-          if (notes.includes(q)) return true;
-
+          const extra = String(o.extraDetails || '').toLowerCase();
           const tag = String(o.factoryTag || '').toLowerCase();
-          if (tag.includes(q)) return true;
-
           const status = String(o.status || '').toLowerCase();
-          if (status.includes(q)) return true;
+          const sfcStatus = String(o.sfcDeliveryStatus || '').toLowerCase();
+          const track = String(o.trackingCode || o.sfcTrackingCode || '').toLowerCase();
+          const fulfillment = String(o.fulfillmentMethod || '').toLowerCase();
 
-          return false;
+          return rawTokens.every(token => {
+            const tokenDigits = token.replace(/\D/g, '');
+
+            if (id.includes(token)) return true;
+            if (name.includes(token)) return true;
+            if (cn.includes(token)) return true;
+            if (phone.toLowerCase().includes(token)) return true;
+            if (tokenDigits && tokenDigits.length >= 3 && phoneDigits.includes(tokenDigits)) return true;
+            if (merchant.includes(token) || merchantId.includes(token)) return true;
+            if (fabric.includes(token)) return true;
+            if (category.includes(token)) return true;
+            if (seat.includes(token)) return true;
+            if (addr.includes(token)) return true;
+            if (notes.includes(token) || extra.includes(token)) return true;
+            if (tag.includes(token)) return true;
+            if (status.includes(token) || sfcStatus.includes(token)) return true;
+            if (track.includes(token)) return true;
+            if (fulfillment.includes(token)) return true;
+            return false;
+          });
         };
 
         const isDateInLedgerRange = (dateStr, range, customStart, customEnd) => {
@@ -4668,9 +4744,15 @@
           else if (ledgerDateRange.value === '7DAYS') dateLabel = 'Past 7 Days';
           else if (ledgerDateRange.value === 'THIS_MONTH') {
             const ym = (typeof dashboardFilter !== 'undefined' && dashboardFilter.selectedMonth) ? dashboardFilter.selectedMonth : getTodayBstDateString().substring(0, 7);
-            dateLabel = `This Month (${ym})`;
+            const mParts = ym.split('-');
+            const mIdx = parseInt(mParts[1], 10) - 1;
+            const mStr = SHORT_MONTH_NAMES[mIdx] || 'jan';
+            const yStr = mParts[0].slice(-2);
+            dateLabel = `This Month (${mStr}-${yStr})`;
           } else if (ledgerDateRange.value === 'CUSTOM') {
-            dateLabel = (ledgerStartDate.value && ledgerEndDate.value) ? `${ledgerStartDate.value} → ${ledgerEndDate.value}` : (ledgerStartDate.value ? `From ${ledgerStartDate.value}` : (ledgerEndDate.value ? `Until ${ledgerEndDate.value}` : 'Custom Range'));
+            dateLabel = (ledgerStartDate.value && ledgerEndDate.value) 
+              ? `${formatDisplayDateOnly(ledgerStartDate.value)} → ${formatDisplayDateOnly(ledgerEndDate.value)}` 
+              : (ledgerStartDate.value ? `From ${formatDisplayDateOnly(ledgerStartDate.value)}` : (ledgerEndDate.value ? `Until ${formatDisplayDateOnly(ledgerEndDate.value)}` : 'Custom Range'));
           }
 
           return {
@@ -5750,8 +5832,12 @@
             return;
           }
           missingFieldsHighlight.value = false;
-          const nextOrderNum = nextUpcomingOrderNum.value;
-          const newId = nextUpcomingOrderId.value;
+          const targetSeller = activeIntakeSeller.value || currentUser.value;
+          const nextOrderNum = getNextOrderNumberForSeller(targetSeller);
+          const customPrefix = (targetSeller && targetSeller.pagePrefix && String(targetSeller.pagePrefix).trim() !== '') 
+            ? String(targetSeller.pagePrefix).trim().toUpperCase() 
+            : 'ORD';
+          const newId = `${customPrefix}-${nextOrderNum}`;
 
           const pad = (n) => String(n).padStart(2, '0');
           const todayBst = getTodayBstDateString();
@@ -5775,7 +5861,7 @@
             orderTimestamp = `${selectedOrderDate}T${hours}:${minutes}:${seconds}+06:00`;
           }
 
-          const sellerUsername = currentUser.value ? currentUser.value?.username : 'seller';
+          const sellerUsername = targetSeller ? (targetSeller.username || targetSeller.name) : 'seller';
           const autoCn = intakeForm.cnNumber || ("CN-" + nextOrderNum);
           const dateStr = selectedOrderDate || getBangladeshDateString(new Date());
           const autoFileName = intakeForm.collagePhotoFileName || `collage_attachments/${sellerUsername}_${autoCn.replace(/[^a-zA-Z0-9-]/g, '')}_${dateStr}.jpg`;
@@ -5792,8 +5878,8 @@
             orderDate: selectedOrderDate,
             createdAt: orderTimestamp,
             isBackdated: isPreviousOrder,
-            merchantId: currentUser.value.id,
-            merchantName: currentUser.value.name,
+            merchantId: targetSeller.id || currentUser.value.id,
+            merchantName: targetSeller.name || currentUser.value.name,
             customerName: intakeForm.customerName,
             customerPhone: normalizedPhone,
             customerAddress: intakeForm.customerAddress,
@@ -5869,6 +5955,7 @@
           intakeForm.isUploadingProof = false;
           intakeForm.extraDetails = '';
           intakeForm.factoryTag = '';
+          intakeForm.selectedSellerId = '';
           clipboardRawText.value = '';
           activeTab.value = 'my_orders';
           
@@ -8960,6 +9047,8 @@ Open your Google Sheet > Extensions > Apps Script, paste the code, click Deploy 
           handleLogout,
           parseClipboard,
           missingFieldsHighlight,
+          getNextOrderNumberForSeller,
+          activeIntakeSeller,
           nextUpcomingOrderNum,
           nextUpcomingOrderId,
           isCopiedUpcomingOrderId,
